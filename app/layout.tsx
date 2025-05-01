@@ -71,6 +71,9 @@ export default async function RootLayout({
         />
       </head>
       <body className="antialiased">
+        <div className="fixed inset-0 -z-10">
+          <div className="absolute inset-0 bg-[url('/images/memeverse.png')] bg-cover bg-center bg-no-repeat bg-fixed" />
+        </div>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

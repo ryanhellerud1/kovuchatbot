@@ -24,6 +24,7 @@ export const postRequestBodySchema = z.object({
       .optional(),
   }),
   selectedChatModel: z.enum(['chat-model', 'chat-model-reasoning']),
+  customPrompt: z.string().max(2000).optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

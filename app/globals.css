@@ -100,7 +100,9 @@
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply text-foreground;
+        min-height: 100vh;
+        background-color: transparent !important;
     }
 }
 

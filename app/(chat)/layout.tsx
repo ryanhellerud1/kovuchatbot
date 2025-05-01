@@ -23,7 +23,7 @@ export default async function Layout({
       />
       <SidebarProvider defaultOpen={!isCollapsed}>
         <AppSidebar user={session?.user} />
-        <SidebarInset>{children}</SidebarInset>
+        <SidebarInset className="bg-transparent">{children}</SidebarInset>
       </SidebarProvider>
     </>
   );
