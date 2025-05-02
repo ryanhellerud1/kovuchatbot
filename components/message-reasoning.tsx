@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDownIcon, LoaderIcon } from './icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Markdown } from './markdown';
@@ -14,7 +14,19 @@ export function MessageReasoning({
   isLoading,
   reasoning,
 }: MessageReasoningProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const variants = {
     collapsed: {
@@ -51,7 +63,7 @@ export function MessageReasoning({
               setIsExpanded(!isExpanded);
             }}
           >
-            <ChevronDownIcon />
+            <ChevronDownIcon className={isExpanded ? 'rotate-180' : ''} />
           </button>
         </div>
       )}

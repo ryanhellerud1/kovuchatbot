@@ -13,24 +13,24 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'What are the advantages',
-      label: 'of using Next.js?',
-      action: 'What are the advantages of using Next.js?',
+      title: 'What is the',
+      label: 'memeverse?',
+      action: 'What is the memeverse?',
     },
     {
-      title: 'Write code to',
-      label: `demonstrate djikstra's algorithm`,
-      action: `Write code to demonstrate djikstra's algorithm`,
+      title: 'How did Kovu get',
+      label: 'his AI powers?',
+      action: 'How did Kovu get his AI powers?',
     },
     {
-      title: 'Help me write an essay',
-      label: `about silicon valley`,
-      action: `Help me write an essay about silicon valley`,
+      title: 'Who is the team',
+      label: 'behind the AI takeover?',
+      action: 'Who is the team behind the AI takeover?',
     },
     {
-      title: 'What is the weather',
-      label: 'in San Francisco?',
-      action: 'What is the weather in San Francisco?',
+      title: 'What is the Kovu',
+      label: 'mini game?',
+      action: 'What is the Kovu mini game?',
     },
   ];
 
