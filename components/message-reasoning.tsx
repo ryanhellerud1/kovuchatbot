@@ -45,7 +45,6 @@ const aiEquations = [
   '\\hat{X}|0\\rangle = |1\\rangle',
   '\\hat{Z}|+\\rangle = |-\\rangle',
   '\\hat{H} = \\frac{1}{\\sqrt{2}} \\begin{pmatrix} 1 & 1 \\\\ 1 & -1 \\end{pmatrix}',
-  '\\hat{CNOT} = \\begin{pmatrix} 1 & 0 & 0 & 0 \\\\ 0 & 1 & 0 & 0 \\\\ 0 & 0 & 0 & 1 \\\\ 0 & 0 & 1 & 0 \\end{pmatrix}'
 ];
 
 // Helper function for random integer
