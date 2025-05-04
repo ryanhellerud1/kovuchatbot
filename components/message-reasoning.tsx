@@ -26,6 +26,26 @@ const aiEquations = [
   '\\alpha',
   '\\lambda ||\\mathbf{w}||^2',
   'P(A|B)',
+  '\\int_{a}^{b} f(x) dx',
+  '\\frac{\\partial f}{\\partial x}',
+  '\\lim_{x \\to \\infty} f(x)',
+  '\\sum_{n=1}^{\\infty} a_n',
+  '\\prod_{i=1}^{n} x_i',
+  '\\frac{d}{dx} f(x)',
+  '\\oint_C \\mathbf{F} \\cdot d\\mathbf{r}',
+  '|\\psi\\rangle',
+  '\\langle \\phi|',
+  '\\hat{H} |\\psi\\rangle = E |\\psi\\rangle',
+  '\\sigma_x = \\begin{pmatrix} 0 & 1 \\\\ 1 & 0 \\end{pmatrix}',
+  '|0\\rangle = \\begin{pmatrix} 1 \\\\ 0 \\end{pmatrix}',
+  '|1\\rangle = \\begin{pmatrix} 0 \\\\ 1 \\end{pmatrix}',
+  '\\frac{1}{\\sqrt{2}}(|0\\rangle + |1\\rangle)',
+  '\\hat{U} = e^{-i\\hat{H}t}',
+  '\\langle \\psi|\\phi \\rangle',
+  '\\hat{X}|0\\rangle = |1\\rangle',
+  '\\hat{Z}|+\\rangle = |-\\rangle',
+  '\\hat{H} = \\frac{1}{\\sqrt{2}} \\begin{pmatrix} 1 & 1 \\\\ 1 & -1 \\end{pmatrix}',
+  '\\hat{CNOT} = \\begin{pmatrix} 1 & 0 & 0 & 0 \\\\ 0 & 1 & 0 & 0 \\\\ 0 & 0 & 0 & 1 \\\\ 0 & 0 & 1 & 0 \\end{pmatrix}'
 ];
 
 // Helper function for random integer
