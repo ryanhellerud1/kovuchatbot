@@ -30,6 +30,9 @@ function PureMessages({
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
 
+  // Log props received by PureMessages
+  console.log('PureMessages props:', { status, messagesLength: messages.length });
+
   return (
     <div
       ref={messagesContainerRef}
@@ -42,7 +45,7 @@ function PureMessages({
           key={message.id}
           chatId={chatId}
           message={message}
-          isLoading={status === 'streaming' && messages.length - 1 === index}
+          isLoading={status === 'streaming'}
           vote={
             votes
               ? votes.find((vote) => vote.messageId === message.id)

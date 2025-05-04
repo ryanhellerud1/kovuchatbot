@@ -38,6 +38,8 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+  
+  console.log('PurePreviewMessage props:', { messageId: message.id, isLoading });
 
   return (
     <AnimatePresence>
@@ -84,13 +86,14 @@ const PurePreviewMessage = ({
             {message.parts?.map((part, index) => {
               const { type } = part;
               const key = `message-${message.id}-part-${index}`;
-
+              
               if (type === 'reasoning') {
+                console.log('Rendering Reasoning Part:', { part, isLoading });
                 return (
                   <MessageReasoning
                     key={key}
                     isLoading={isLoading}
-                    reasoning={part.reasoning}
+                    reasoning={part.reasoning || ''}
                   />
                 );
               }
