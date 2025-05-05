@@ -90,7 +90,7 @@ export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps
               />
             );
             newContentParts.push(' ');
-            currentIndex += 12;
+            currentIndex += 5;
           }
         }
 
