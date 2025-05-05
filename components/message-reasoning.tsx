@@ -57,46 +57,48 @@ function getRandomInt(min: number, max: number): number {
 export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [isExpanded, setIsExpanded] = useState(isDesktop);
-  // State to hold the array of React nodes (strings and MathEquation components)
   const [contentParts, setContentParts] = useState<ReactNode[]>([]);
+  const [processedWords, setProcessedWords] = useState<number>(0);
 
   console.log('MessageReasoning received reasoning prop:', reasoning);
 
   useEffect(() => {
     if (reasoning) {
-      console.log('MessageReasoning useEffect triggered with reasoning:', reasoning);
-      const words = reasoning.split(' ').filter(word => word.trim() !== ''); // Split and remove empty strings
-      const newContentParts: ReactNode[] = [];
-      let currentIndex = 0;
+      const words = reasoning.split(' ').filter(word => word.trim() !== '');
+      
+      // Only process new words
+      if (words.length > processedWords) {
+        const newWords = words.slice(processedWords);
+        const newContentParts: ReactNode[] = [];
+        let currentIndex = 0;
 
-      while (currentIndex < words.length) {
-        // Determine chunk size (3-12 words)
-        const chunkSize = getRandomInt(2, 5);
-        const textChunk = words.slice(currentIndex, currentIndex + chunkSize).join(' ');
-        if (textChunk) {
-          newContentParts.push(textChunk + ' '); // Add space after text chunk
-        }
-        currentIndex += chunkSize;
+        while (currentIndex < newWords.length) {
+          const chunkSize = getRandomInt(2, 5);
+          const textChunk = newWords.slice(currentIndex, currentIndex + chunkSize).join(' ');
+          if (textChunk) {
+            newContentParts.push(textChunk + ' ');
+          }
+          currentIndex += chunkSize;
 
-        // If there are more words, add an equation and skip next 12 words
-        if (currentIndex < words.length) {
-          const randomEquation = aiEquations[Math.floor(Math.random() * aiEquations.length)];
-          newContentParts.push(
-            <MathEquation 
-              key={`eq-${currentIndex}`} // Add key for list rendering
-              equation={randomEquation} 
-              displayMode={false} // Use inline display mode
-            />
-          );
-          // Add a space after the equation for readability
-          newContentParts.push(' '); 
-          currentIndex += 12; // Skip words for the equation
+          if (currentIndex < newWords.length) {
+            const randomEquation = aiEquations[Math.floor(Math.random() * aiEquations.length)];
+            newContentParts.push(
+              <MathEquation 
+                key={`eq-${processedWords + currentIndex}`}
+                equation={randomEquation} 
+                displayMode={false}
+              />
+            );
+            newContentParts.push(' ');
+            currentIndex += 12;
+          }
         }
+
+        setContentParts(prevParts => [...prevParts, ...newContentParts]);
+        setProcessedWords(words.length);
       }
-      console.log('Calculated contentParts:', newContentParts);
-      setContentParts(newContentParts);
     }
-  }, [reasoning]);
+  }, [reasoning, processedWords]);
 
   useEffect(() => {
     if (isDesktop) {
