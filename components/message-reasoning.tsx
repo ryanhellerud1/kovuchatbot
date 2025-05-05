@@ -56,7 +56,7 @@ function getRandomInt(min: number, max: number): number {
 
 export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
-  const [isExpanded, setIsExpanded] = useState(isDesktop);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [contentParts, setContentParts] = useState<ReactNode[]>([]);
   const [processedWords, setProcessedWords] = useState<number>(0);
 
