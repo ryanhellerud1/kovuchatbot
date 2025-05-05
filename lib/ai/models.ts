@@ -25,7 +25,7 @@ export const chatModels: Array<ChatModel> = [
   {
     id: 'chat-model-reasoning-qwen3',
     name: 'Kovu AI Deep Think',
-    description: 'Qwen3 model with advanced reasoning',
+    description: 'Kovu AI with advanced reasoning',
   },
   // {
   //   id: 'title-model-qwen3',
