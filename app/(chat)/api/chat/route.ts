@@ -33,15 +33,17 @@ export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
   try {
-    const json = await request.json();
-    requestBody = postRequestBodySchema.parse(json);
-  } catch (_) {
+    requestBody = postRequestBodySchema.parse(await request.json());
+  } catch (error) {
     return new Response('Invalid request body', { status: 400 });
   }
 
-  try {
-    const { id, message, selectedChatModel } = requestBody;
+  const { id, message, selectedChatModel } = requestBody;
+  if (!selectedChatModel || !['chat-model', 'chat-model-reasoning', 'chat-model-qwen3', 'chat-model-reasoning-qwen3', 'title-model-qwen3', 'artifact-model-qwen3'].includes(selectedChatModel)) {
+    return new Response('Invalid model selected', { status: 400 });
+  }
 
+  try {
     const session = await auth();
 
     if (!session?.user) {
@@ -49,19 +51,23 @@ export async function POST(request: Request) {
     }
 
     const userType: UserType = session.user.type;
+    const isQwen3Model = selectedChatModel.includes('qwen3');
 
-    const messageCount = await getMessageCountByUserId({
-      id: session.user.id,
-      differenceInHours: 24,
-    });
+    // Skip message count check for Qwen3 models
+    if (!isQwen3Model) {
+      const messageCount = await getMessageCountByUserId({
+        id: session.user.id,
+        differenceInHours: 24,
+      });
 
-    if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
-      return new Response(
-        'You have exceeded your maximum number of messages for the day! Please try again later.',
-        {
-          status: 429,
-        },
-      );
+      if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
+        return new Response(
+          'You have exceeded your maximum number of messages for the day! Please try again later.',
+          {
+            status: 429,
+          },
+        );
+      }
     }
 
     const chat = await getChatById({ id });
@@ -108,9 +114,25 @@ export async function POST(request: Request) {
       ],
     });
 
+    console.log('[API Route] System Prompt:', systemPrompt({ 
+      selectedChatModel, 
+      requestHints,
+      customPrompt: requestBody.customPrompt 
+    }));
+    console.log('[API Route] Messages:', JSON.stringify(messages, null, 2));
+
+    // Determine if the selected model supports tools
+    const qwen3ModelIds = [
+      'chat-model-qwen3',
+      'chat-model-reasoning-qwen3',
+      'title-model-qwen3',
+      'artifact-model-qwen3'
+    ];
+    const supportsTools = !qwen3ModelIds.includes(selectedChatModel);
+
     return createDataStreamResponse({
       execute: (dataStream) => {
-        const result = streamText({
+        const streamTextConfig = {
           model: myProvider.languageModel(selectedChatModel),
           system: systemPrompt({ 
             selectedChatModel, 
@@ -119,26 +141,8 @@ export async function POST(request: Request) {
           }),
           messages,
           maxSteps: 5,
-          experimental_activeTools:
-            selectedChatModel === 'chat-model-reasoning'
-              ? []
-              : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
-                ],
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
-          tools: {
-            getWeather,
-            createDocument: createDocument({ session, dataStream }),
-            updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({
-              session,
-              dataStream,
-            }),
-          },
           onFinish: async ({ response }) => {
             if (session.user?.id) {
               try {
@@ -179,19 +183,40 @@ export async function POST(request: Request) {
             isEnabled: isProductionEnvironment,
             functionId: 'stream-text',
           },
-        });
+        };
 
+        // Conditionally add tools only if the model supports them
+        if (supportsTools) {
+          streamTextConfig.tools = {
+            getWeather,
+            createDocument: createDocument({ session, dataStream }),
+            updateDocument: updateDocument({ session, dataStream }),
+            requestSuggestions: requestSuggestions({
+              session,
+              dataStream,
+            }),
+          };
+        }
+        
+        const result = streamText(streamTextConfig);
+
+        console.log('[API Route] Starting stream consumption...');
         result.consumeStream();
 
+        console.log('[API Route] Merging stream into dataStream...');
         result.mergeIntoDataStream(dataStream, {
-          sendReasoning: true,
+          // Only send reasoning if the model supports it (optional refinement)
+          sendReasoning: selectedChatModel.includes('reasoning'),
         });
+        console.log('[API Route] Stream merging finished.');
       },
-      onError: () => {
+      onError: (error) => {
+        console.error('[API Route] DataStream Error:', error);
         return 'Oops, an error occurred!';
       },
     });
   } catch (_) {
+    console.error('[API Route] General POST Error:', _);
     return new Response('An error occurred while processing your request!', {
       status: 500,
     });

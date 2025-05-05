@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { chatModels } from '@/lib/ai/models';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 import { CheckCircleFillIcon, ChevronDownIcon } from './icons';
 import { entitlementsByUserType } from '@/lib/ai/entitlements';
@@ -21,9 +22,11 @@ export function ModelSelector({
   session,
   selectedModelId,
   className,
+  status,
 }: {
   session: Session;
   selectedModelId: string;
+  status: 'ready' | 'streaming' | 'error' | 'submitted';
 } & React.ComponentProps<typeof Button>) {
   const [open, setOpen] = useState(false);
   const [optimisticModelId, setOptimisticModelId] =
@@ -57,6 +60,7 @@ export function ModelSelector({
           data-testid="model-selector"
           variant="outline"
           className="md:px-2 md:h-[34px]"
+          disabled={status === 'streaming' || status === 'submitted'}
         >
           {selectedChatModel?.name}
           <ChevronDownIcon />
@@ -71,11 +75,17 @@ export function ModelSelector({
               data-testid={`model-selector-item-${id}`}
               key={id}
               onSelect={() => {
+                if (status === 'streaming' || status === 'submitted') {
+                  toast.error('Please wait for the model to finish its response!');
+                  return;
+                }
                 setOpen(false);
 
                 startTransition(() => {
                   setOptimisticModelId(id);
-                  saveChatModelAsCookie(id);
+                  saveChatModelAsCookie(id).then(() => {
+                    window.location.reload();
+                  });
                 });
               }}
               data-active={id === optimisticModelId}

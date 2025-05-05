@@ -89,7 +89,7 @@ export const systemPrompt = ({
   const requestPrompt = getRequestPromptFromHints(requestHints);
   const basePrompt = customPrompt || regularPrompt;
 
-  if (selectedChatModel === 'chat-model-reasoning') {
+  if (selectedChatModel === 'chat-model-reasoning' || selectedChatModel === 'chat-model-reasoning-qwen3') {
     return `${basePrompt}\n\n${requestPrompt}`;
   } else {
     return `${basePrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;

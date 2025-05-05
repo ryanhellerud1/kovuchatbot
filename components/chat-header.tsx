@@ -20,12 +20,14 @@ function PureChatHeader({
   selectedVisibilityType,
   isReadonly,
   session,
+  status,
 }: {
   chatId: string;
   selectedModelId: string;
   selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
   session: Session;
+  status: 'ready' | 'streaming' | 'error' | 'submitted';
 }) {
   const router = useRouter();
   const { open } = useSidebar();
@@ -60,6 +62,7 @@ function PureChatHeader({
           session={session}
           selectedModelId={selectedModelId}
           className="order-1 md:order-2"
+          status={status}
         />
       )}
 
@@ -75,5 +78,5 @@ function PureChatHeader({
 }
 
 export const ChatHeader = memo(PureChatHeader, (prevProps, nextProps) => {
-  return prevProps.selectedModelId === nextProps.selectedModelId;
+  return prevProps.selectedModelId === nextProps.selectedModelId && prevProps.status === nextProps.status;
 });

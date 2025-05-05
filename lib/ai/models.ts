@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'chat-model';
+export const DEFAULT_CHAT_MODEL: string = 'chat-model-reasoning-qwen3';
 
 export interface ChatModel {
   id: string;
@@ -17,4 +17,24 @@ export const chatModels: Array<ChatModel> = [
     name: 'Reasoning model',
     description: 'Uses advanced reasoning',
   },
+  // {
+  //   id: 'chat-model-qwen3',
+  //   name: 'Qwen3 Chat',
+  //   description: 'Qwen3 model for chat',
+  // },
+  {
+    id: 'chat-model-reasoning-qwen3',
+    name: 'Kovu AI Deep Think',
+    description: 'Qwen3 model with advanced reasoning',
+  },
+  // {
+  //   id: 'title-model-qwen3',
+  //   name: 'Qwen3 Title',
+  //   description: 'Qwen3 model for title generation',
+  // },
+  // {
+  //   id: 'artifact-model-qwen3',
+  //   name: 'Qwen3 Artifact',
+  //   description: 'Qwen3 model for artifact generation',
+  // },
 ];

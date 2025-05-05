@@ -64,6 +64,9 @@ export function Chat({
         type: 'error',
         description: error.message,
       });
+      if (status === 'error') {
+        reload();
+      }
     },
   });
 
@@ -101,6 +104,7 @@ export function Chat({
           selectedVisibilityType={selectedVisibilityType}
           isReadonly={isReadonly}
           session={session}
+          status={status}
         />
 
         <Messages

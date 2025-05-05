@@ -9,6 +9,7 @@ import {
 } from '@/lib/db/queries';
 import type { VisibilityType } from '@/components/visibility-selector';
 import { myProvider } from '@/lib/ai/providers';
+import { DEFAULT_CHAT_MODEL } from '@/lib/ai/models';
 
 export async function saveChatModelAsCookie(model: string) {
   const cookieStore = await cookies();
