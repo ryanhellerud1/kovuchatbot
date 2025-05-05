@@ -39,7 +39,12 @@ const PurePreviewMessage = ({
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
   
-  console.log('PurePreviewMessage props:', { messageId: message.id, isLoading });
+  console.log('PurePreviewMessage props:', { 
+    messageId: message.id, 
+    isLoading,
+    messageContent: message.content,
+    messageParts: message.parts
+  });
 
   return (
     <AnimatePresence>
@@ -128,7 +133,7 @@ const PurePreviewMessage = ({
                           'bg-muted px-3 py-2 rounded-xl': message.role === 'assistant'
                         })}
                       >
-                        <Markdown>{part.text}</Markdown>
+                        {part.text ? <Markdown>{part.text}</Markdown> : null}
                       </div>
                     </div>
                   );

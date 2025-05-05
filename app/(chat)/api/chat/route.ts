@@ -144,7 +144,7 @@ export async function POST(request: Request) {
             customPrompt: requestBody.customPrompt 
           }),
           messages,
-          maxSteps: 5,
+          maxSteps: 10,
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
           onFinish: (async (event) => {
@@ -157,6 +157,7 @@ export async function POST(request: Request) {
                 });
 
                 if (!assistantId) {
+                  console.error('[API Route] No assistant message found in response');
                   throw new Error('No assistant message found!');
                 }
 
@@ -164,6 +165,8 @@ export async function POST(request: Request) {
                   messages: [message],
                   responseMessages: event.response.messages,
                 });
+
+                console.log('[API Route] Saving assistant message:', assistantMessage);
 
                 await saveMessages({
                   messages: [
@@ -178,8 +181,8 @@ export async function POST(request: Request) {
                     },
                   ],
                 });
-              } catch (_) {
-                console.error('Failed to save chat');
+              } catch (error) {
+                console.error('[API Route] Failed to save chat:', error);
               }
             }
           }) as StreamTextOnFinishCallback<ToolSet>,
@@ -202,17 +205,34 @@ export async function POST(request: Request) {
           };
         }
         
-        const result = streamText(streamTextConfig);
+        console.log('[API Route] streamTextConfig:', JSON.stringify(streamTextConfig, null, 2));
+        try {
+          const result = streamText(streamTextConfig);
+          console.log('[API Route] streamText call succeeded. Result object:', result);
 
-        console.log('[API Route] Starting stream consumption...');
-        result.consumeStream();
-
-        console.log('[API Route] Merging stream into dataStream...');
-        result.mergeIntoDataStream(dataStream, {
-          // Only send reasoning if the model supports it (optional refinement)
-          sendReasoning: selectedChatModel.includes('reasoning'),
-        });
-        console.log('[API Route] Stream merging finished.');
+          console.log('[API Route] Merging stream into dataStream...');
+          result.mergeIntoDataStream(dataStream, {
+            sendReasoning: selectedChatModel.includes('reasoning'),
+            onError: (error) => {
+              console.error('[API Route] Stream merging error:', error);
+            },
+            onChunk: (chunk) => {
+              console.log('[API Route] Received chunk for dataStream:', chunk);
+              if (chunk.type === 'text' && chunk.text) {
+                console.log('[API Route] Text chunk for dataStream:', chunk.text);
+              } else if (chunk.type === 'reasoning' && chunk.reasoning) {
+                console.log('[API Route] Reasoning chunk for dataStream:', chunk.reasoning);
+              }
+            },
+            onComplete: () => {
+              console.log('[API Route] Stream completed successfully for dataStream');
+            }
+          });
+          console.log('[API Route] Stream merging finished.');
+        } catch (error) {
+            console.error('[API Route] Error calling streamText:', error);
+            dataStream.close(); // Close the stream on error
+        }
       },
       onError: (error) => {
         console.error('[API Route] DataStream Error:', error);

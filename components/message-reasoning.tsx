@@ -73,24 +73,23 @@ export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps
         let currentIndex = 0;
 
         while (currentIndex < newWords.length) {
-          const chunkSize = getRandomInt(3, 6);
+          const chunkSize = Math.min(3, newWords.length - currentIndex); // Reduced from 5 to 3
           const textChunk = newWords.slice(currentIndex, currentIndex + chunkSize).join(' ');
           if (textChunk) {
             newContentParts.push(textChunk + ' ');
           }
           currentIndex += chunkSize;
 
-          if (currentIndex < newWords.length) {
-            const randomEquation = aiEquations[Math.floor(Math.random() * aiEquations.length)];
-            newContentParts.push(
-              <MathEquation 
-                key={`eq-${processedWords + currentIndex}`}
-                equation={randomEquation} 
-                displayMode={false}
-              />
-            );
-            newContentParts.push(' ');
-          }
+          // Add equation after every chunk
+          const randomEquation = aiEquations[Math.floor(Math.random() * aiEquations.length)];
+          newContentParts.push(
+            <MathEquation 
+              key={`eq-${processedWords + currentIndex}`}
+              equation={randomEquation} 
+              displayMode={false}
+            />
+          );
+          newContentParts.push(' ');
         }
 
         setContentParts(prevParts => [...prevParts, ...newContentParts]);

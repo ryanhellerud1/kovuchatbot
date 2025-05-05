@@ -70,12 +70,16 @@ function PureMessages({
 }
 
 export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-  if (prevProps.isArtifactVisible && nextProps.isArtifactVisible) return true;
-
-  if (prevProps.status !== nextProps.status) return false;
-  if (prevProps.status && nextProps.status) return false;
+  // Always update during streaming
+  if (prevProps.status === 'streaming' || nextProps.status === 'streaming') return false;
+  
+  // Update if messages length changes
   if (prevProps.messages.length !== nextProps.messages.length) return false;
+  
+  // Update if messages content changes
   if (!equal(prevProps.messages, nextProps.messages)) return false;
+  
+  // Update if votes change
   if (!equal(prevProps.votes, nextProps.votes)) return false;
 
   return true;

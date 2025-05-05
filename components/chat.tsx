@@ -56,17 +56,26 @@ export function Chat({
       message: body.messages.at(-1),
       selectedChatModel,
     }),
-    onFinish: () => {
+    onFinish: (message) => {
+      console.log('[Chat] Stream finished, message:', message);
+      if (message && message.content) {
+        console.log('[Chat] Final message content:', message.content);
+      }
       mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
     onError: (error) => {
+      console.error('[Chat] Error during streaming:', error);
       toast({
         type: 'error',
         description: error.message,
       });
       if (status === 'error') {
+        console.log('[Chat] Attempting to reload after error');
         reload();
       }
+    },
+    onResponse: (response) => {
+      console.log('[Chat] Received response status:', response.status);
     },
   });
 
@@ -94,6 +103,16 @@ export function Chat({
 
   const [attachments, setAttachments] = useState<Array<Attachment>>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
+
+  useEffect(() => {
+    console.log('[Chat] Status changed:', status);
+    console.log('[Chat] Current messages:', messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      parts: m.parts
+    })));
+  }, [status, messages]);
 
   return (
     <>
