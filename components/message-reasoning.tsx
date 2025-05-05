@@ -73,7 +73,7 @@ export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps
         let currentIndex = 0;
 
         while (currentIndex < newWords.length) {
-          const chunkSize = getRandomInt(2, 5);
+          const chunkSize = getRandomInt(3, 6);
           const textChunk = newWords.slice(currentIndex, currentIndex + chunkSize).join(' ');
           if (textChunk) {
             newContentParts.push(textChunk + ' ');
@@ -90,7 +90,6 @@ export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps
               />
             );
             newContentParts.push(' ');
-            currentIndex += 5;
           }
         }
 

@@ -4,6 +4,10 @@ import {
   createDataStreamResponse,
   smoothStream,
   streamText,
+  type Message,
+  type StreamTextConfig,
+  type StreamTextOnFinishCallback,
+  type ToolSet,
 } from 'ai';
 import { auth, type UserType } from '@/app/(auth)/auth';
 import { type RequestHints, systemPrompt } from '@/lib/ai/prompts';
@@ -132,7 +136,7 @@ export async function POST(request: Request) {
 
     return createDataStreamResponse({
       execute: (dataStream) => {
-        const streamTextConfig = {
+        const streamTextConfig: Partial<StreamTextConfig> & { tools?: ToolSet } = {
           model: myProvider.languageModel(selectedChatModel),
           system: systemPrompt({ 
             selectedChatModel, 
@@ -143,11 +147,11 @@ export async function POST(request: Request) {
           maxSteps: 5,
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
-          onFinish: async ({ response }) => {
+          onFinish: (async (event) => {
             if (session.user?.id) {
               try {
                 const assistantId = getTrailingMessageId({
-                  messages: response.messages.filter(
+                  messages: event.response.messages.filter(
                     (message) => message.role === 'assistant',
                   ),
                 });
@@ -158,7 +162,7 @@ export async function POST(request: Request) {
 
                 const [, assistantMessage] = appendResponseMessages({
                   messages: [message],
-                  responseMessages: response.messages,
+                  responseMessages: event.response.messages,
                 });
 
                 await saveMessages({
@@ -167,7 +171,7 @@ export async function POST(request: Request) {
                       id: assistantId,
                       chatId: id,
                       role: assistantMessage.role,
-                      parts: assistantMessage.parts,
+                      parts: assistantMessage.parts || [],
                       attachments:
                         assistantMessage.experimental_attachments ?? [],
                       createdAt: new Date(),
@@ -178,7 +182,7 @@ export async function POST(request: Request) {
                 console.error('Failed to save chat');
               }
             }
-          },
+          }) as StreamTextOnFinishCallback<ToolSet>,
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: 'stream-text',
