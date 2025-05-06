@@ -8,7 +8,7 @@ import { SessionProvider } from 'next-auth/react';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://chat.vercel.ai'),
-  title: 'Next.js Chatbot Template',
+  title: 'Kovu AI Deep Think V1.0',
   description: 'Next.js chatbot template using the AI SDK.',
 };
 

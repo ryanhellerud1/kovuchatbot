@@ -90,6 +90,9 @@ export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps
             />
           );
           newContentParts.push(' ');
+
+          // Delete 3 words after appending the equation
+          newWords.splice(currentIndex, 3);
         }
 
         setContentParts(prevParts => [...prevParts, ...newContentParts]);
