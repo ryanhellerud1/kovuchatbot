@@ -19,7 +19,7 @@ const openrouter = createOpenRouter({
 });
 
 // Define the model identifier constant (optional but good practice)
-const QWEN3_MODEL_NAME = 'qwen/qwen3-235b-a22b:free';
+const QWEN3_MODEL_NAME = 'qwen/qwen3-32b:free';
 
 export const myProvider = isTestEnvironment
   ? customProvider({
