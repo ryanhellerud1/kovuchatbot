@@ -7,9 +7,21 @@ import './globals.css';
 import { SessionProvider } from 'next-auth/react';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://chat.vercel.ai'),
-  title: 'Kovu AI Deep Think V1.0',
-  description: 'Next.js chatbot template using the AI SDK.',
+  metadataBase: new URL('https://kovuchatbot.vercel.app'),
+  title: 'KovuChatbot',
+  description: 'Chat with Kovu, your AI assistant.',
+  openGraph: {
+    title: 'KovuChatbot',
+    description: 'Chat with Kovu, your AI assistant.',
+    images: [
+      {
+        url: '/images/kovuhandsbg.png',
+        width: 1200, // You might want to adjust these dimensions based on your image
+        height: 630,
+        alt: 'KovuChatbot Thumbnail',
+      },
+    ],
+  },
 };
 
 export const viewport = {
