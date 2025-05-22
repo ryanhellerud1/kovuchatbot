@@ -27,8 +27,7 @@ export const requestProactiveSuggestions = ({
       // Construct a prompt for the AI model
       const prompt = `
         Given the following chat history:
-        ${chatHistory.map(msg => `${msg.role}: ${msg.content}`).join('
-')}
+        ${chatHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
 
         And the user's current partial query:
         "${partialQuery}"
