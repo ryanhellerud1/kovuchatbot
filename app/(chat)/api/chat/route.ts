@@ -5,7 +5,6 @@ import {
   smoothStream,
   streamText,
   type Message,
-  type StreamTextConfig,
   type StreamTextOnFinishCallback,
   type ToolSet,
 } from 'ai';
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   const { id, message, selectedChatModel } = requestBody;
-  if (!selectedChatModel || !['chat-model', 'chat-model-reasoning', 'chat-model-qwen3', 'chat-model-reasoning-qwen3', 'title-model-qwen3', 'artifact-model-qwen3'].includes(selectedChatModel)) {
+  if (!selectedChatModel || selectedChatModel !== 'chat-model-reasoning-qwen3') {
     return new Response('Invalid model selected', { status: 400 });
   }
 
@@ -55,23 +54,19 @@ export async function POST(request: Request) {
     }
 
     const userType: UserType = session.user.type;
-    const isQwen3Model = selectedChatModel.includes('qwen3');
+    // Skip message count check since we only have one model
+    const messageCount = await getMessageCountByUserId({
+      id: session.user.id,
+      differenceInHours: 24,
+    });
 
-    // Skip message count check for Qwen3 models
-    if (!isQwen3Model) {
-      const messageCount = await getMessageCountByUserId({
-        id: session.user.id,
-        differenceInHours: 24,
-      });
-
-      if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
-        return new Response(
-          'You have exceeded your maximum number of messages for the day! Please try again later.',
-          {
-            status: 429,
-          },
-        );
-      }
+    if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
+      return new Response(
+        'You have exceeded your maximum number of messages for the day! Please try again later.',
+        {
+          status: 429,
+        },
+      );
     }
 
     const chat = await getChatById({ id });
@@ -125,18 +120,9 @@ export async function POST(request: Request) {
     }));
     console.log('[API Route] Messages:', JSON.stringify(messages, null, 2));
 
-    // Determine if the selected model supports tools
-    const qwen3ModelIds = [
-      'chat-model-qwen3',
-      'chat-model-reasoning-qwen3',
-      'title-model-qwen3',
-      'artifact-model-qwen3'
-    ];
-    const supportsTools = !qwen3ModelIds.includes(selectedChatModel);
-
     return createDataStreamResponse({
       execute: (dataStream) => {
-        const streamTextConfig: Partial<StreamTextConfig> & { tools?: ToolSet } = {
+        const streamTextConfig = {
           model: myProvider.languageModel(selectedChatModel),
           system: systemPrompt({ 
             selectedChatModel, 
@@ -191,19 +177,6 @@ export async function POST(request: Request) {
             functionId: 'stream-text',
           },
         };
-
-        // Conditionally add tools only if the model supports them
-        if (supportsTools) {
-          streamTextConfig.tools = {
-            getWeather,
-            createDocument: createDocument({ session, dataStream }),
-            updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({
-              session,
-              dataStream,
-            }),
-          };
-        }
         
         console.log('[API Route] streamTextConfig:', JSON.stringify(streamTextConfig, null, 2));
         try {
@@ -212,26 +185,12 @@ export async function POST(request: Request) {
 
           console.log('[API Route] Merging stream into dataStream...');
           result.mergeIntoDataStream(dataStream, {
-            sendReasoning: selectedChatModel.includes('reasoning'),
-            onError: (error) => {
-              console.error('[API Route] Stream merging error:', error);
-            },
-            onChunk: (chunk) => {
-              console.log('[API Route] Received chunk for dataStream:', chunk);
-              if (chunk.type === 'text' && chunk.text) {
-                console.log('[API Route] Text chunk for dataStream:', chunk.text);
-              } else if (chunk.type === 'reasoning' && chunk.reasoning) {
-                console.log('[API Route] Reasoning chunk for dataStream:', chunk.reasoning);
-              }
-            },
-            onComplete: () => {
-              console.log('[API Route] Stream completed successfully for dataStream');
-            }
+            sendReasoning: true, // Always true since we're using the reasoning model
           });
           console.log('[API Route] Stream merging finished.');
         } catch (error) {
             console.error('[API Route] Error calling streamText:', error);
-            dataStream.close(); // Close the stream on error
+            // Handle error appropriately without calling close()
         }
       },
       onError: (error) => {
