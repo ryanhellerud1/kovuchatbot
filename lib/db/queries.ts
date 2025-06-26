@@ -26,6 +26,10 @@ import {
   vote,
   type DBMessage,
   type Chat,
+  knowledgeDocuments,
+  documentChunks,
+  type KnowledgeDocument,
+  type DocumentChunk,
 } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
 import { generateUUID } from '../utils';
@@ -467,6 +471,180 @@ export async function getMessageCountByUserId({
     console.error(
       'Failed to get message count by user id for the last 24 hours from database',
     );
+    throw error;
+  }
+}
+
+// Knowledge Base Document Operations
+
+export async function saveKnowledgeDocument({
+  id,
+  userId,
+  title,
+  content,
+  fileUrl,
+  fileType,
+  fileSize,
+  metadata,
+}: {
+  id: string;
+  userId: string;
+  title: string;
+  content?: string;
+  fileUrl?: string;
+  fileType?: string;
+  fileSize?: number;
+  metadata?: any;
+}): Promise<KnowledgeDocument> {
+  try {
+    const [knowledgeDocument] = await db
+      .insert(knowledgeDocuments)
+      .values({
+        id,
+        userId,
+        title,
+        content,
+        fileUrl,
+        fileType,
+        fileSize,
+        metadata,
+      })
+      .returning();
+
+    return knowledgeDocument;
+  } catch (error) {
+    console.error('Failed to save knowledge document to database');
+    throw error;
+  }
+}
+
+export async function saveDocumentChunk({
+  documentId,
+  chunkIndex,
+  content,
+  embedding,
+  metadata,
+}: {
+  documentId: string;
+  chunkIndex: number;
+  content: string;
+  embedding: number[];
+  metadata?: any;
+}): Promise<DocumentChunk> {
+  try {
+    const [chunk] = await db
+      .insert(documentChunks)
+      .values({
+        documentId,
+        chunkIndex,
+        content,
+        embedding: embedding, // Drizzle handles JSON serialization automatically
+        chunkMetadata: metadata,
+      })
+      .returning();
+
+    return chunk;
+  } catch (error) {
+    console.error('Failed to save document chunk to database');
+    throw error;
+  }
+}
+
+export async function getUserKnowledgeDocuments(
+  userId: string,
+  limit: number = 50,
+  offset: number = 0,
+): Promise<KnowledgeDocument[]> {
+  try {
+    return await db
+      .select()
+      .from(knowledgeDocuments)
+      .where(eq(knowledgeDocuments.userId, userId))
+      .orderBy(desc(knowledgeDocuments.createdAt))
+      .limit(limit)
+      .offset(offset);
+  } catch (error) {
+    console.error('Failed to get user knowledge documents from database');
+    throw error;
+  }
+}
+
+export async function getUserDocumentChunks(userId: string) {
+  try {
+    return await db
+      .select({
+        id: documentChunks.id,
+        documentId: documentChunks.documentId,
+        content: documentChunks.content,
+        embedding: documentChunks.embedding,
+        chunkIndex: documentChunks.chunkIndex,
+        chunkMetadata: documentChunks.chunkMetadata,
+        documentTitle: knowledgeDocuments.title,
+        createdAt: documentChunks.createdAt,
+      })
+      .from(documentChunks)
+      .innerJoin(
+        knowledgeDocuments,
+        eq(documentChunks.documentId, knowledgeDocuments.id),
+      )
+      .where(eq(knowledgeDocuments.userId, userId))
+      .orderBy(desc(documentChunks.createdAt));
+  } catch (error) {
+    console.error('Failed to get user document chunks from database');
+    throw error;
+  }
+}
+
+export async function getKnowledgeDocumentById(
+  id: string,
+  userId: string,
+): Promise<KnowledgeDocument | null> {
+  try {
+    const [knowledgeDocument] = await db
+      .select()
+      .from(knowledgeDocuments)
+      .where(
+        and(eq(knowledgeDocuments.id, id), eq(knowledgeDocuments.userId, userId)),
+      );
+
+    return knowledgeDocument || null;
+  } catch (error) {
+    console.error('Failed to get knowledge document by id from database');
+    throw error;
+  }
+}
+
+export async function getDocumentChunks(documentId: string) {
+  try {
+    return await db
+      .select()
+      .from(documentChunks)
+      .where(eq(documentChunks.documentId, documentId))
+      .orderBy(asc(documentChunks.chunkIndex));
+  } catch (error) {
+    console.error('Failed to get document chunks from database');
+    throw error;
+  }
+}
+
+export async function deleteKnowledgeDocument(
+  id: string,
+  userId: string,
+): Promise<void> {
+  try {
+    // Delete chunks first (due to foreign key constraint)
+    await db
+      .delete(documentChunks)
+      .where(eq(documentChunks.documentId, id));
+
+    // Delete the document
+    await db
+      .delete(knowledgeDocuments)
+      .where(
+        and(eq(knowledgeDocuments.id, id), eq(knowledgeDocuments.userId, userId)),
+      );
+  } catch (error) {
+    console.error('Failed to delete knowledge document from database');
     throw error;
   }
 }
