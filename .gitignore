@@ -38,6 +38,7 @@ lib/rag/test-*
 
 # Documentation (development notes)
 docs/
+**/.agent.md
 
 # Logs
 *.log
