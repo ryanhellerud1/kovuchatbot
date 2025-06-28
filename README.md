@@ -20,7 +20,7 @@
 Kovu is a RAG (Retrieval-Augmented Generation) assistant. You can ask it questions about your documents, and it will use them to provide answers.
 
 To get started (ensure you have selected the **Kovu AI with Tools** model):
-1.  Upload your documents using the upload button.
+1.  Upload your documents using the upload button via sidebar.
 2.  Ask a question in the chat box.
 3.  Kovu will search your documents and generate a relevant answer.
 
