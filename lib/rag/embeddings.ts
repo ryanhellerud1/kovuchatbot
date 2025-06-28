@@ -14,7 +14,19 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     return embedding;
   } catch (error) {
     console.error('Error generating embedding:', error);
-    throw new Error('Failed to generate embedding');
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        throw new Error('OpenAI API key is missing or invalid. Please check your OPENAI_API_KEY environment variable.');
+      } else if (error.message.includes('quota')) {
+        throw new Error('OpenAI API quota exceeded. Please check your OpenAI account usage.');
+      } else if (error.message.includes('rate limit')) {
+        throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+      }
+    }
+    
+    throw new Error('Failed to generate embedding. Please check your OpenAI API configuration.');
   }
 }
 
@@ -31,7 +43,19 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
     return embeddings;
   } catch (error) {
     console.error('Error generating embeddings:', error);
-    throw new Error('Failed to generate embeddings');
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        throw new Error('OpenAI API key is missing or invalid. Please check your OPENAI_API_KEY environment variable.');
+      } else if (error.message.includes('quota')) {
+        throw new Error('OpenAI API quota exceeded. Please check your OpenAI account usage.');
+      } else if (error.message.includes('rate limit')) {
+        throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+      }
+    }
+    
+    throw new Error('Failed to generate embeddings. Please check your OpenAI API configuration.');
   }
 }
 

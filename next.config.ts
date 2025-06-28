@@ -15,25 +15,24 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
+    // Handle pdf-parse test file issue
+    config.module.rules.push({
+      test: /node_modules\/pdf-parse\/.*\.js$/,
+      use: {
+        loader: 'string-replace-loader',
+        options: {
+          search: /require\(['"]\.\/test\/data\/.*?['"]\)/g,
+          replace: 'null',
+          flags: 'g',
+        },
+      },
+    });
+
     // Handle Node.js modules for server-side rendering
     if (isServer) {
       config.externals = config.externals || [];
-      // Externalize problematic modules
-      config.externals.push({
-        'pdf-parse': 'commonjs pdf-parse',
-        'mammoth': 'commonjs mammoth',
-      });
+      // Don't externalize these anymore since we're fixing the test file issue
     }
-
-    // Ignore test files that cause issues
-    config.resolve.alias = {
-      ...config.resolve.alias,
-    };
-
-    config.module.rules.push({
-      test: /\.pdf$/,
-      type: 'asset/resource',
-    });
 
     return config;
   },

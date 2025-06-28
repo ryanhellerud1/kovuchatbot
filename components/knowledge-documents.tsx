@@ -32,11 +32,13 @@ interface KnowledgeDocumentDisplay {
 
 interface KnowledgeDocumentsProps {
   className?: string;
+  compact?: boolean;
   onDocumentSelect?: (document: KnowledgeDocumentDisplay) => void;
 }
 
 export function KnowledgeDocuments({ 
   className, 
+  compact = false,
   onDocumentSelect 
 }: KnowledgeDocumentsProps) {
   const { documents, isLoading, error, fetchDocuments, deleteDocument } = useKnowledgeDocuments();

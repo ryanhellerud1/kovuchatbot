@@ -1,6 +1,6 @@
-import pdfParse from 'pdf-parse';
 import * as mammoth from 'mammoth';
 import { generateEmbedding, generateEmbeddings } from './embeddings';
+import { parsePDFBuffer, isValidPDFBuffer } from './pdf-parser-json';
 
 /**
  * Supported file types for document processing
@@ -43,16 +43,42 @@ export async function extractTextFromFile(
   try {
     switch (fileType) {
       case 'pdf':
-        const pdfData = await pdfParse(file);
-        return pdfData.text;
+        // Validate PDF buffer first
+        if (!isValidPDFBuffer(file)) {
+          throw new Error('Invalid PDF file format');
+        }
+        
+        // Use the pdf2json-based parser
+        return await parsePDFBuffer(file, fileName);
         
       case 'docx':
-        const docxResult = await mammoth.extractRawText({ buffer: file });
-        return docxResult.value;
+        try {
+          const docxResult = await mammoth.extractRawText({ buffer: file });
+          
+          if (!docxResult.value || docxResult.value.trim().length === 0) {
+            throw new Error('No text content found in DOCX file');
+          }
+          
+          return docxResult.value;
+        } catch (docxError) {
+          console.error('DOCX parsing error:', docxError);
+          throw new Error('Failed to parse DOCX file. The file may be corrupted or password-protected.');
+        }
         
       case 'txt':
       case 'md':
-        return file.toString('utf-8');
+        try {
+          const textContent = file.toString('utf-8');
+          
+          if (!textContent || textContent.trim().length === 0) {
+            throw new Error('No text content found in file');
+          }
+          
+          return textContent;
+        } catch (textError) {
+          console.error('Text file parsing error:', textError);
+          throw new Error('Failed to parse text file. The file may be corrupted or in an unsupported encoding.');
+        }
         
       default:
         throw new Error(`Unsupported file type: ${fileType}`);
