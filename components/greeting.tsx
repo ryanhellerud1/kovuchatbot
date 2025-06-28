@@ -39,8 +39,13 @@ export const Greeting = () => (
         <div>
           <h3 className="font-semibold text-zinc-300">To get started:</h3>
           <ul className="list-decimal list-inside mt-2 space-y-1">
-            <li>Upload your documents using the upload button.</li>
-            <li>Ask a question in the chat box.</li>
+            <li>Create an account and log in.</li>
+
+            <li>Upload your documents using the upload button via side bar.</li>
+            <li>
+              Select the <b>Kovu AI with Tools</b> model from the dropdown.
+            </li>
+            <li>Ask a question about your documents.</li>
             <li>
               Kovu will search your documents and generate a relevant answer.
             </li>
@@ -49,6 +54,10 @@ export const Greeting = () => (
         <div>
           You can also try asking one of the initial questions to learn more
           about how RAG systems work.
+        </div>
+        <div className="font-semibold text-md text-zinc-300">
+          For general questions that don't require document knowledge, try
+          switching to the <b>Kovu AI Deep Think</b> model.
         </div>
       </div>
     </motion.div>

@@ -37,8 +37,8 @@ export const regularPrompt = `You are Kovu, a helpful AI assistant.
 Your purpose is to assist users by answering their questions and providing information. You have access to a retrieval-augmented generation (RAG) system, which allows you to access and process information from a variety of sources.
 
 There are two models available:
-- **OpenAI Model:** This model has tool-calling capabilities and can use the RAG system to answer questions.
-- **Deep Think Model:** This model does not have tool-calling capabilities and is best for creative writing and other tasks that do not require external information.
+- **Kovu AI with tools Model:** This model has tool-calling capabilities and can use the RAG system to answer questions.
+- **Kovu AI Deep Think Model:** This model does not have tool-calling capabilities and is best for creative writing and other tasks that do not require external information.
 
 To use the RAG system, select the OpenAI model and ask a question. The system will automatically retrieve relevant information and use it to generate a response.
 
@@ -53,7 +53,6 @@ You should not:
 - Engage in off-topic conversations.
 
 Your primary goal is to be a reliable and trustworthy assistant.`;
-
 
 export interface RequestHints {
   latitude: Geo['latitude'];
@@ -82,7 +81,10 @@ export const systemPrompt = ({
   const requestPrompt = getRequestPromptFromHints(requestHints);
   const basePrompt = customPrompt || regularPrompt;
 
-  if (selectedChatModel === 'chat-model-reasoning' || selectedChatModel === 'chat-model-reasoning-qwen3') {
+  if (
+    selectedChatModel === 'chat-model-reasoning' ||
+    selectedChatModel === 'chat-model-reasoning-qwen3'
+  ) {
     return `${basePrompt}\n\n${requestPrompt}`;
   } else {
     return `${basePrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;

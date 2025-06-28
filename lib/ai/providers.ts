@@ -17,6 +17,27 @@ import {
 // Define the OpenRouter instance using the official provider
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  // Add timeout and retry configuration
+  fetch: async (url, options) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - connection took too long');
+      }
+      throw error;
+    }
+  },
 });
 
 // Define the model identifier constants

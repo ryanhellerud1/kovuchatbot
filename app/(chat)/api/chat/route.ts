@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     console.log('[API Route] Messages:', JSON.stringify(messages, null, 2));
 
     return createDataStreamResponse({
-      execute: (dataStream) => {
+      execute: async (dataStream) => {
         const streamTextConfig = {
           model: myProvider.languageModel(selectedChatModel),
           system: systemPrompt({ 
@@ -189,23 +189,58 @@ export async function POST(request: Request) {
         };
         
         console.log('[API Route] streamTextConfig:', JSON.stringify(streamTextConfig, null, 2));
-        try {
-          const result = streamText(streamTextConfig);
-          console.log('[API Route] streamText call succeeded. Result object:', result);
+        
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        while (retryCount <= maxRetries) {
+          try {
+            console.log(`[API Route] Attempting streamText call (attempt ${retryCount + 1}/${maxRetries + 1})`);
+            const result = streamText(streamTextConfig);
+            console.log('[API Route] streamText call succeeded. Result object:', result);
 
-          console.log('[API Route] Merging stream into dataStream...');
-          result.mergeIntoDataStream(dataStream, {
-            sendReasoning: true, // Always true since we're using the reasoning model
-          });
-          console.log('[API Route] Stream merging finished.');
-        } catch (error) {
-            console.error('[API Route] Error calling streamText:', error);
-            // Handle error appropriately without calling close()
+            console.log('[API Route] Merging stream into dataStream...');
+            await result.mergeIntoDataStream(dataStream, {
+              sendReasoning: selectedChatModel === 'chat-model-reasoning-qwen3',
+            });
+            console.log('[API Route] Stream merging finished successfully.');
+            break; // Success, exit retry loop
+            
+          } catch (error) {
+            console.error(`[API Route] Error on attempt ${retryCount + 1}:`, error);
+            
+            // Check if it's a connection reset or timeout error
+            const isConnectionError = error.message?.includes('ECONNRESET') || 
+                                    error.message?.includes('timeout') ||
+                                    error.message?.includes('terminated') ||
+                                    error.name === 'AbortError';
+            
+            if (isConnectionError && retryCount < maxRetries) {
+              retryCount++;
+              console.log(`[API Route] Connection error detected, retrying in ${retryCount * 1000}ms...`);
+              await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+              continue;
+            }
+            
+            // If not a connection error or we've exhausted retries, throw the error
+            console.error('[API Route] Final error after retries:', error);
+            throw error;
+          }
         }
       },
       onError: (error) => {
         console.error('[API Route] DataStream Error:', error);
-        return 'Oops, an error occurred!';
+        
+        // Provide more specific error messages based on error type
+        if (error.message?.includes('ECONNRESET')) {
+          return 'Connection was reset while processing your request. Please try again.';
+        } else if (error.message?.includes('timeout')) {
+          return 'Request timed out. Please try again with a shorter message.';
+        } else if (error.message?.includes('terminated')) {
+          return 'Stream was terminated unexpectedly. Please try again.';
+        }
+        
+        return 'An error occurred while processing your request. Please try again.';
       },
     });
   } catch (_) {
