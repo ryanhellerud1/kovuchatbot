@@ -56,7 +56,7 @@ export const Greeting = () => (
           about how RAG systems work.
         </div>
         <div className="font-semibold text-md text-zinc-300">
-          For general questions that don't require document knowledge, try
+          For general questions that don&#39;t require document knowledge, try
           switching to the <b>Kovu AI Deep Think</b> model.
         </div>
       </div>
