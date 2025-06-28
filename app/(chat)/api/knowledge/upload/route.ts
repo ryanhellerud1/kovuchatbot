@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { put } from '@vercel/blob';
 
 import { auth } from '@/app/(auth)/auth';
-import { processDocument, getFileType, validateFileSize } from '@/lib/rag/document-processor';
+import { processDocument, getFileType, validateFileSize } from '@/lib/rag/document-processor-safe';
 import { saveKnowledgeDocument, saveDocumentChunk } from '@/lib/db/queries';
 import { generateUUID } from '@/lib/utils';
 

@@ -12,4 +12,9 @@ export const chatModels: Array<ChatModel> = [
     name: 'Kovu AI Deep Think',
     description: 'Kovu AI with advanced reasoning',
   },
+  {
+    id: 'chat-model-tools',
+    name: 'Kovu AI with Tools',
+    description: 'Kovu AI with knowledge search and tool capabilities',
+  },
 ];

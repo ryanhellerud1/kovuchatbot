@@ -24,6 +24,7 @@ import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
+import { searchKnowledge } from '@/lib/ai/tools/search-knowledge';
 import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider } from '@/lib/ai/providers';
 import { entitlementsByUserType } from '@/lib/ai/entitlements';
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   const { id, message, selectedChatModel } = requestBody;
-  if (!selectedChatModel || selectedChatModel !== 'chat-model-reasoning-qwen3') {
+  if (!selectedChatModel || !['chat-model-reasoning-qwen3', 'chat-model-tools'].includes(selectedChatModel)) {
     return new Response('Invalid model selected', { status: 400 });
   }
 
@@ -131,6 +132,15 @@ export async function POST(request: Request) {
           }),
           messages,
           maxSteps: 10,
+          ...(selectedChatModel === 'chat-model-tools' && {
+            tools: {
+              createDocument: createDocument({ session, dataStream }),
+              updateDocument: updateDocument({ session, dataStream }),
+              requestSuggestions: requestSuggestions({ session, dataStream }),
+              getWeather: getWeather,
+              searchKnowledge: searchKnowledge({ session }),
+            },
+          }),
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
           onFinish: (async (event) => {
