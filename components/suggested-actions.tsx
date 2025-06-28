@@ -13,24 +13,24 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'What is the',
-      label: 'memeverse?',
-      action: 'What is the memeverse?',
+      title: 'What is a',
+      label: 'RAG system?',
+      action: 'What is a RAG system?',
     },
     {
-      title: 'How did Kovu get',
-      label: 'his AI powers?',
-      action: 'How did Kovu get his AI powers?',
+      title: 'How do I use',
+      label: 'this RAG system?',
+      action: 'How do I use this RAG system?',
     },
     {
-      title: 'Who is the team',
-      label: 'behind the AI takeover?',
-      action: 'Who is the team behind the AI takeover?',
+      title: 'What are the best',
+      label: 'practices for RAG?',
+      action: 'What are the best practices for RAG?',
     },
     {
-      title: 'What is the Kovu',
-      label: 'mini game?',
-      action: 'What is the Kovu mini game?',
+      title: 'How can I improve',
+      label: 'my RAG system?',
+      action: 'How can I improve my RAG system?',
     },
   ];
 

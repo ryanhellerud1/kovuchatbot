@@ -1,62 +1,77 @@
-<a href="https://chat.vercel.ai/">
-  <img alt="Next.js 14 and App Router-ready AI chatbot." src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chat SDK</h1>
+<a href="https://kovu.ai/">
+  <img alt="Kovu RAG" src="public/images/kovuhandsbg.png">
+  <h1 align="center">Kovu RAG Chatbot</h1>
 </a>
 
 <p align="center">
-    Chat SDK is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
+  An advanced, open-source RAG (Retrieval-Augmented Generation) chatbot template built with Next.js and the Vercel AI SDK. This project provides a solid foundation for building powerful, context-aware AI applications with knowledge base capabilities.
 </p>
 
 <p align="center">
-  <a href="https://chat-sdk.dev"><strong>Read Docs</strong></a> ·
   <a href="#features"><strong>Features</strong></a> ·
-  <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
-  <a href="#running-locally"><strong>Running locally</strong></a>
+  <a href="#architecture"><strong>RAG Architecture</strong></a> ·
+  <a href="#model-providers"><strong>Model Providers</strong></strong></a> ·
+  <a href="#running-locally"><strong>Running Locally</strong></a>
 </p>
 <br/>
 
+## Getting Started
+
+Kovu is a RAG (Retrieval-Augmented Generation) assistant. You can ask it questions about your documents, and it will use them to provide answers.
+
+To get started (ensure you have selected the **Kovu AI with Tools** model):
+1.  Upload your documents using the upload button via sidebar.
+2.  Ask a question in the chat box.
+3.  Kovu will search your documents and generate a relevant answer.
+
+You can also try asking one of the initial questions to learn more about how RAG systems work.
+
 ## Features
 
-- [Next.js](https://nextjs.org) App Router
-  - Advanced routing for seamless navigation and performance
-  - React Server Components (RSCs) and Server Actions for server-side rendering and increased performance
-- [AI SDK](https://sdk.vercel.ai/docs)
-  - Unified API for generating text, structured objects, and tool calls with LLMs
-  - Hooks for building dynamic chat and generative user interfaces
-  - Supports xAI (default), OpenAI, Fireworks, and other model providers
-- [shadcn/ui](https://ui.shadcn.com)
-  - Styling with [Tailwind CSS](https://tailwindcss.com)
-  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- Data Persistence
-  - [Neon Serverless Postgres](https://vercel.com/marketplace/neon) for saving chat history and user data
-  - [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
-- [Auth.js](https://authjs.dev)
-  - Simple and secure authentication
+- **Retrieval-Augmented Generation (RAG)**: Connect your own knowledge base by uploading documents. The chatbot can then retrieve relevant information to provide context-aware and accurate answers.
+- **Next.js App Router**: Utilizes the latest Next.js features, including React Server Components (RSCs) and Server Actions for optimal performance and a modern development experience.
+- **Vercel AI SDK**: Employs the AI SDK for seamless integration with large language models, providing hooks and utilities for building dynamic chat interfaces.
+- **Customizable AI Models**: Natively supports "Kovu AI" models for advanced reasoning and tool usage, and is easily extensible to other providers.
+- **Document Handling**: Supports uploading and processing of various document formats for building the knowledge base.
+- **Styling with shadcn/ui & Tailwind CSS**: A modern and accessible UI built with the best-in-class tools for easy customization.
+- **PostgreSQL Database with JSON Embeddings**: Uses a standard PostgreSQL database to store chat history and vector embeddings (as JSON arrays), with an in-app similarity search.
+- **Authentication**: Secure user authentication handled by [Auth.js](https://authjs.dev).
+
+## RAG Architecture
+
+The RAG implementation in this project follows these steps:
+1.  **Document Upload**: Users can upload documents through the UI.
+2.  **Processing & Chunking**: The documents are parsed and split into smaller, manageable chunks of text.
+3.  **Embedding Generation**: Each text chunk is converted into a vector embedding using a sentence-transformer model.
+4.  **Vector Storage**: The embeddings are stored as a JSON array in a PostgreSQL database alongside the text chunks.
+5.  **Retrieval**: When a user sends a message, the application fetches all document chunks for the user and performs a cosine similarity search in-memory to find the most relevant ones.
+6.  **Context Injection**: The retrieved text chunks are injected into the prompt as context for the language model.
+7.  **Generation**: The LLM generates a response that is grounded in the provided context, resulting in more accurate and relevant answers.
 
 ## Model Providers
 
-This template ships with [xAI](https://x.ai) `grok-2-1212` as the default chat model. However, with the [AI SDK](https://sdk.vercel.ai/docs), you can switch LLM providers to [OpenAI](https://openai.com), [Anthropic](https://anthropic.com), [Cohere](https://cohere.com/), and [many more](https://sdk.vercel.ai/providers/ai-sdk-providers) with just a few lines of code.
+This template is configured to use custom **Kovu AI** models out of the box:
 
-## Deploy Your Own
+- **Kovu AI Deep Think**: An advanced model focused on complex reasoning and generation.
+- **Kovu AI with Tools**: A model with capabilities for knowledge search and executing tools.
 
-You can deploy your own version of the Next.js AI Chatbot to Vercel with one click:
+The underlying Vercel AI SDK makes it easy to switch to other providers like OpenAI, Anthropic, Cohere, and more with minimal code changes.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fai-chatbot&env=AUTH_SECRET&envDescription=Generate%20a%20random%20secret%20to%20use%20for%20authentication&envLink=https%3A%2F%2Fgenerate-secret.vercel.app%2F32&project-name=my-awesome-chatbot&repository-name=my-awesome-chatbot&demo-title=AI%20Chatbot&demo-description=An%20Open-Source%20AI%20Chatbot%20Template%20Built%20With%20Next.js%20and%20the%20AI%20SDK%20by%20Vercel&demo-url=https%3A%2F%2Fchat.vercel.ai&products=%5B%7B%22type%22%3A%22integration%22%2C%22protocol%22%3A%22ai%22%2C%22productSlug%22%3A%22grok%22%2C%22integrationSlug%22%3A%22xai%22%7D%2C%7B%22type%22%3A%22integration%22%2C%22protocol%22%3A%22storage%22%2C%22productSlug%22%3A%22neon%22%2C%22integrationSlug%22%3A%22neon%22%7D%2C%7B%22type%22%3A%22blob%22%7D%5D)
+## Running Locally
 
-## Running locally
+To run this project locally, you'll need to set up your environment variables.
 
-You will need to use the environment variables [defined in `.env.example`](.env.example) to run Next.js AI Chatbot. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
+1.  **Copy the environment file:**
+    ```bash
+    cp .env.example .env.local
+    ```
+2.  **Fill in the environment variables:**
+    Open `.env.local` and provide the necessary values for authentication, database, and any AI model provider keys you wish to use.
 
-> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various AI and authentication provider accounts.
+3.  **Install dependencies and run the development server:**
+    ```bash
+    pnpm install
+    pnpm dev
+    ```
 
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
-
-```bash
-pnpm install
-pnpm dev
-```
-
-Your app template should now be running on [localhost:3000](http://localhost:3000).
+Your application should now be running on [http://localhost:3000](http://localhost:3000).

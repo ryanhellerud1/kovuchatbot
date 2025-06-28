@@ -9,6 +9,7 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  integer,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -150,3 +151,36 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+// Knowledge Base Documents
+export const knowledgeDocuments = pgTable('knowledge_documents', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => user.id),
+  title: text('title').notNull(),
+  content: text('content'),
+  fileUrl: text('file_url'),
+  fileType: varchar('file_type', { length: 10 }), // 'pdf', 'txt', 'md', 'docx'
+  fileSize: integer('file_size'),
+  metadata: json('metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export type KnowledgeDocument = InferSelectModel<typeof knowledgeDocuments>;
+
+// Document Chunks (with embeddings stored as JSON)
+export const documentChunks = pgTable('document_chunks', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  documentId: uuid('document_id')
+    .notNull()
+    .references(() => knowledgeDocuments.id),
+  chunkIndex: integer('chunk_index').notNull(),
+  content: text('content').notNull(),
+  embedding: json('embedding'), // Store embedding vector as JSON array
+  chunkMetadata: json('chunk_metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export type DocumentChunk = InferSelectModel<typeof documentChunks>;

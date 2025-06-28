@@ -21,17 +21,20 @@ export async function generateTitleFromUserMessage({
 }: {
   message: UIMessage;
 }) {
-  const { text: title } = await generateText({
-    model: myProvider.languageModel(DEFAULT_CHAT_MODEL),
-    system: `\n
-    - you will generate a short title based on the first message a user begins a conversation with
-    - ensure it is not more than 80 characters long
-    - the title should be a summary of the user's message
-    - do not use quotes or colons`,
-    prompt: JSON.stringify(message),
-  });
+  try {
+    const { text: title } = await generateText({
+      model: myProvider.languageModel('chat-model-tools'), // Use the OpenAI model that works
+      system: `Generate a short title (max 80 characters) based on the user's message. Do not use quotes or colons.`,
+      prompt: typeof message.content === 'string' ? message.content : JSON.stringify(message),
+    });
 
-  return title;
+    return title;
+  } catch (error) {
+    console.error('Error generating title:', error);
+    // Fallback to a simple title if generation fails
+    const content = typeof message.content === 'string' ? message.content : 'New Chat';
+    return content.length > 50 ? content.substring(0, 47) + '...' : content;
+  }
 }
 
 export async function deleteTrailingMessages({ id }: { id: string }) {
