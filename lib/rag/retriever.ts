@@ -32,13 +32,9 @@ export interface SearchOptions {
 export async function searchKnowledgeBase(
   query: string,
   userId: string,
-  options: SearchOptions = {}
+  options: SearchOptions = {},
 ): Promise<SearchResult[]> {
-  const {
-    limit = 5,
-    minSimilarity = 0.7,
-    includeMetadata = true,
-  } = options;
+  const { limit = 10, minSimilarity = 0.4, includeMetadata = true } = options;
 
   try {
     // Generate embedding for the search query
@@ -53,7 +49,7 @@ export async function searchKnowledgeBase(
 
     // Calculate similarity scores
     const results: SearchResult[] = [];
-    
+
     for (const chunk of chunks) {
       if (!chunk.embedding) {
         console.warn(`Chunk ${chunk.id} has no embedding, skipping`);
@@ -87,10 +83,7 @@ export async function searchKnowledgeBase(
     }
 
     // Sort by similarity (highest first) and limit results
-    return results
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
-
+    return results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
   } catch (error) {
     console.error('Error searching knowledge base:', error);
     throw new Error('Failed to search knowledge base');
@@ -104,13 +97,9 @@ export async function searchWithinDocument(
   query: string,
   documentId: string,
   userId: string,
-  options: SearchOptions = {}
+  options: SearchOptions = {},
 ): Promise<SearchResult[]> {
-  const {
-    limit = 3,
-    minSimilarity = 0.6,
-    includeMetadata = true,
-  } = options;
+  const { limit = 3, minSimilarity = 0.4, includeMetadata = true } = options;
 
   try {
     // Generate embedding for the search query
@@ -118,7 +107,9 @@ export async function searchWithinDocument(
 
     // Get chunks for the specific document
     const chunks = await getUserDocumentChunks(userId);
-    const documentChunks = chunks.filter(chunk => chunk.documentId === documentId);
+    const documentChunks = chunks.filter(
+      (chunk) => chunk.documentId === documentId,
+    );
 
     if (documentChunks.length === 0) {
       return [];
@@ -126,7 +117,7 @@ export async function searchWithinDocument(
 
     // Calculate similarity scores and filter
     const results: SearchResult[] = [];
-    
+
     for (const chunk of documentChunks) {
       if (!chunk.embedding) continue;
 
@@ -152,10 +143,7 @@ export async function searchWithinDocument(
       }
     }
 
-    return results
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
-
+    return results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
   } catch (error) {
     console.error('Error searching within document:', error);
     throw new Error('Failed to search within document');
@@ -168,19 +156,16 @@ export async function searchWithinDocument(
 export async function getRelatedContent(
   chunkId: string,
   userId: string,
-  options: SearchOptions = {}
+  options: SearchOptions = {},
 ): Promise<SearchResult[]> {
-  const {
-    limit = 5,
-    minSimilarity = 0.8,
-  } = options;
+  const { limit = 5, minSimilarity = 0.4 } = options;
 
   try {
     // Get all user's chunks
     const chunks = await getUserDocumentChunks(userId);
-    
+
     // Find the source chunk
-    const sourceChunk = chunks.find(chunk => chunk.id === chunkId);
+    const sourceChunk = chunks.find((chunk) => chunk.id === chunkId);
     if (!sourceChunk || !sourceChunk.embedding) {
       return [];
     }
@@ -192,7 +177,7 @@ export async function getRelatedContent(
 
     // Find similar chunks (excluding the source chunk itself)
     const results: SearchResult[] = [];
-    
+
     for (const chunk of chunks) {
       if (chunk.id === chunkId || !chunk.embedding) continue;
 
@@ -217,10 +202,7 @@ export async function getRelatedContent(
       }
     }
 
-    return results
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
-
+    return results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
   } catch (error) {
     console.error('Error getting related content:', error);
     throw new Error('Failed to get related content');

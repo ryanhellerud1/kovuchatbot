@@ -42,6 +42,8 @@ interface UploadResponse {
     fileSize: number;
     chunkCount: number;
     fileUrl?: string;
+    summary: string;
+    firstPageContent: string;
   };
 }
 
@@ -111,17 +113,20 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
     // Process document with RAG pipeline
-    console.log(`Processing document: ${filename} (${fileType})`);
+    console.log(`Processing document with RAG pipeline: ${filename}`);
     const processedDocument = await processDocument(fileBuffer, filename, fileType);
+    console.log(`Document processed. Chunks: ${processedDocument.chunks.length}`);
 
     // Optional: Save original file to blob storage
     let fileUrl: string | undefined;
     if (saveToBlob) {
+      console.log('Attempting to save original file to blob storage.');
       try {
         const blobResult = await put(`knowledge/${session.user.id}/${filename}`, fileBuffer, {
           access: 'public', // Note: Vercel Blob doesn't support private access in free tier
         });
         fileUrl = blobResult.url;
+        console.log('File saved to blob storage.', fileUrl);
       } catch (error) {
         console.warn('Failed to save file to blob storage:', error);
         // Continue without blob storage - not critical for RAG functionality
@@ -129,6 +134,7 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
     }
 
     // Save knowledge document to database
+    console.log('Saving knowledge document metadata to database.');
     const documentId = generateUUID();
     const savedDocument = await saveKnowledgeDocument({
       id: documentId,
@@ -145,8 +151,10 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
         embeddingModel: 'text-embedding-3-small',
       },
     });
+    console.log('Knowledge document metadata saved.', savedDocument.id);
 
     // Save document chunks with embeddings
+    console.log(`Saving ${processedDocument.chunks.length} document chunks with embeddings.`);
     const chunkPromises = processedDocument.chunks.map(async (chunk, index) => {
       return saveDocumentChunk({
         documentId: savedDocument.id,
@@ -158,9 +166,11 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
     });
 
     await Promise.all(chunkPromises);
+    console.log('All document chunks saved.');
 
     console.log(`Successfully processed document: ${filename} with ${processedDocument.chunks.length} chunks`);
 
+    console.log('Server preparing to send success response for document:', savedDocument.title);
     // Return success response
     return NextResponse.json({
       success: true,
@@ -171,6 +181,8 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
         fileSize: savedDocument.fileSize || 0,
         chunkCount: processedDocument.chunks.length,
         fileUrl: savedDocument.fileUrl || undefined,
+        summary: processedDocument.summary,
+        firstPageContent: processedDocument.firstPageContent,
       },
     });
 

@@ -8,6 +8,8 @@ interface KnowledgeDocument {
   fileSize: number;
   chunkCount: number;
   fileUrl?: string;
+  summary: string;
+  firstPageContent: string;
 }
 
 interface UploadResponse {
@@ -66,13 +68,18 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
       }
 
       setUploadProgress(20);
+      console.log('Starting fetch to /api/knowledge/upload');
 
       // Upload to knowledge endpoint
       const response = await fetch('/api/knowledge/upload', {
         method: 'POST',
         body: formData,
+      }).catch(fetchError => {
+        console.error('Fetch network error:', fetchError);
+        throw fetchError; // Re-throw to be caught by the main try-catch
       });
 
+      console.log('Fetch response received. Updating progress to 80%');
       setUploadProgress(80);
 
       const data: UploadResponse | UploadError = await response.json();
@@ -100,6 +107,7 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
       });
       return null;
     } finally {
+      console.log('Upload process finished. Resetting state.');
       setIsUploading(false);
       setUploadProgress(0);
     }

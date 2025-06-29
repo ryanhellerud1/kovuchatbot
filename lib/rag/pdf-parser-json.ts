@@ -10,7 +10,10 @@ import { tmpdir } from 'os';
 /**
  * Parse PDF buffer using pdf2json
  */
-export async function parsePDFWithJson(buffer: Buffer, fileName: string): Promise<string> {
+export async function parsePDFWithJson(
+  buffer: Buffer,
+  fileName: string,
+): Promise<string> {
   try {
     // Validate buffer
     if (!Buffer.isBuffer(buffer)) {
@@ -27,20 +30,26 @@ export async function parsePDFWithJson(buffer: Buffer, fileName: string): Promis
       throw new Error('Invalid PDF file - missing PDF signature');
     }
 
-    console.log(`Parsing PDF with pdf2json: ${fileName}, size: ${buffer.length} bytes`);
+    console.log(
+      `Parsing PDF with pdf2json: ${fileName}, size: ${buffer.length} bytes`,
+    );
 
     // Dynamic import to avoid bundling issues
     const PDFParser = (await import('pdf2json')).default;
-    
+
     return new Promise((resolve, reject) => {
       const pdfParser = new (PDFParser as any)(null, 1);
-      
+
       let extractedText = '';
-      
+
       // Set up event handlers
       pdfParser.on('pdfParser_dataError', (errData: any) => {
         console.error('PDF parsing error:', errData);
-        reject(new Error(`PDF parsing failed: ${errData.parserError || 'Unknown error'}`));
+        reject(
+          new Error(
+            `PDF parsing failed: ${errData.parserError || 'Unknown error'}`,
+          ),
+        );
       });
 
       pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
@@ -48,7 +57,7 @@ export async function parsePDFWithJson(buffer: Buffer, fileName: string): Promis
           // Extract text from the parsed data
           if (pdfData && pdfData.Pages && Array.isArray(pdfData.Pages)) {
             const textParts: string[] = [];
-            
+
             for (const page of pdfData.Pages) {
               if (page.Texts && Array.isArray(page.Texts)) {
                 for (const textItem of page.Texts) {
@@ -64,15 +73,17 @@ export async function parsePDFWithJson(buffer: Buffer, fileName: string): Promis
                 }
               }
             }
-            
+
             extractedText = textParts.join(' ').trim();
-            
+
             if (!extractedText || extractedText.length === 0) {
               reject(new Error('No text content found in PDF'));
               return;
             }
-            
-            console.log(`PDF parsed successfully: ${extractedText.length} characters extracted`);
+
+            console.log(
+              `PDF parsed successfully: ${extractedText.length} characters extracted`,
+            );
             resolve(extractedText);
           } else {
             reject(new Error('Invalid PDF structure - no pages found'));
@@ -91,7 +102,6 @@ export async function parsePDFWithJson(buffer: Buffer, fileName: string): Promis
         reject(new Error('Failed to start PDF parsing'));
       }
     });
-
   } catch (error) {
     console.error(`Error parsing PDF ${fileName}:`, error);
     throw error;
@@ -101,22 +111,30 @@ export async function parsePDFWithJson(buffer: Buffer, fileName: string): Promis
 /**
  * Alternative PDF parser using file-based approach for compatibility
  */
-export async function parsePDFWithFile(buffer: Buffer, fileName: string): Promise<string> {
+export async function parsePDFWithFile(
+  buffer: Buffer,
+  fileName: string,
+): Promise<string> {
   const tempDir = tmpdir();
-  const tempPdfPath = join(tempDir, `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.pdf`);
+  const tempPdfPath = join(
+    tempDir,
+    `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.pdf`,
+  );
 
   try {
     // Write buffer to temporary file
     writeFileSync(tempPdfPath, buffer);
 
-    console.log(`Parsing PDF from file: ${fileName}, size: ${buffer.length} bytes`);
+    console.log(
+      `Parsing PDF from file: ${fileName}, size: ${buffer.length} bytes`,
+    );
 
     // Dynamic import to avoid bundling issues
     const PDFParser = (await import('pdf2json')).default;
-    
+
     return new Promise((resolve, reject) => {
       const pdfParser = new (PDFParser as any)(null, 1);
-      
+
       // Set up event handlers
       pdfParser.on('pdfParser_dataError', (errData: any) => {
         console.error('PDF parsing error:', errData);
@@ -126,7 +144,11 @@ export async function parsePDFWithFile(buffer: Buffer, fileName: string): Promis
         } catch (cleanupError) {
           console.warn('Failed to clean up temp file:', cleanupError);
         }
-        reject(new Error(`PDF parsing failed: ${errData.parserError || 'Unknown error'}`));
+        reject(
+          new Error(
+            `PDF parsing failed: ${errData.parserError || 'Unknown error'}`,
+          ),
+        );
       });
 
       pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
@@ -141,7 +163,7 @@ export async function parsePDFWithFile(buffer: Buffer, fileName: string): Promis
           // Extract text from the parsed data
           if (pdfData && pdfData.Pages && Array.isArray(pdfData.Pages)) {
             const textParts: string[] = [];
-            
+
             for (const page of pdfData.Pages) {
               if (page.Texts && Array.isArray(page.Texts)) {
                 for (const textItem of page.Texts) {
@@ -157,15 +179,17 @@ export async function parsePDFWithFile(buffer: Buffer, fileName: string): Promis
                 }
               }
             }
-            
+
             const extractedText = textParts.join(' ').trim();
-            
+
             if (!extractedText || extractedText.length === 0) {
               reject(new Error('No text content found in PDF'));
               return;
             }
-            
-            console.log(`PDF parsed successfully: ${extractedText.length} characters extracted`);
+
+            console.log(
+              `PDF parsed successfully: ${extractedText.length} characters extracted`,
+            );
             resolve(extractedText);
           } else {
             reject(new Error('Invalid PDF structure - no pages found'));
@@ -190,7 +214,6 @@ export async function parsePDFWithFile(buffer: Buffer, fileName: string): Promis
         reject(new Error('Failed to load PDF file'));
       }
     });
-
   } catch (error) {
     // Clean up temp file on error
     try {
@@ -205,7 +228,10 @@ export async function parsePDFWithFile(buffer: Buffer, fileName: string): Promis
 /**
  * Main PDF parsing function that tries multiple approaches
  */
-export async function parsePDFBuffer(buffer: Buffer, fileName: string): Promise<string> {
+export async function parsePDFBuffer(
+  buffer: Buffer,
+  fileName: string,
+): Promise<string> {
   // Validate buffer first
   if (!Buffer.isBuffer(buffer)) {
     throw new Error('Invalid buffer provided');
@@ -221,7 +247,9 @@ export async function parsePDFBuffer(buffer: Buffer, fileName: string): Promise<
     throw new Error('Invalid PDF file - missing PDF signature');
   }
 
-  console.log(`Attempting to parse PDF: ${fileName}, size: ${buffer.length} bytes`);
+  console.log(
+    `Attempting to parse PDF: ${fileName}, size: ${buffer.length} bytes`,
+  );
 
   // Try buffer-based parsing first (faster)
   try {
@@ -229,7 +257,7 @@ export async function parsePDFBuffer(buffer: Buffer, fileName: string): Promise<
   } catch (error) {
     const bufferError = error as Error;
     console.warn('Buffer-based PDF parsing failed:', bufferError.message);
-    
+
     // If buffer parsing fails, try file-based approach
     try {
       console.log('Attempting file-based PDF parsing...');
@@ -237,12 +265,12 @@ export async function parsePDFBuffer(buffer: Buffer, fileName: string): Promise<
     } catch (error) {
       const fileError = error as Error;
       console.error('File-based PDF parsing also failed:', fileError.message);
-      
+
       // Both methods failed, provide helpful error message
       throw new Error(
         `PDF parsing failed with both methods. Error details: ${bufferError.message}. ` +
-        'This PDF may be corrupted, password-protected, or contain only images. ' +
-        'Please try a different PDF or convert to text format.'
+          'This PDF may be corrupted, password-protected, or contain only images. ' +
+          'Please try a different PDF or convert to text format.',
       );
     }
   }
@@ -255,6 +283,6 @@ export function isValidPDFBuffer(buffer: Buffer): boolean {
   if (!Buffer.isBuffer(buffer) || buffer.length < 4) {
     return false;
   }
-  
+
   return buffer.slice(0, 4).toString() === '%PDF';
 }
