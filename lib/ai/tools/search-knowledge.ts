@@ -53,6 +53,8 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
       }
 
       try {
+        console.log(`[searchKnowledge] Starting search for query: "${query}"`);
+        
         // Validate parameters
         const validatedLimit = Math.min(Math.max(limit, 1), 10);
         let validatedSimilarity = Math.min(Math.max(minSimilarity, 0.0), 1.0);
@@ -63,11 +65,14 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
           if (queryTokens < 3) {
             // Broader search for short queries
             validatedSimilarity = Math.max(0.3, validatedSimilarity - 0.1);
-          } else if (queryTokens > 5) {
-            // Narrower search for longer queries
-            validatedSimilarity = Math.min(0.5, validatedSimilarity + 0.1);
+          } else if (queryTokens > 7) {
+            // Only increase threshold for very long queries (8+ words)
+            validatedSimilarity = Math.min(0.5, validatedSimilarity + 0.05);
           }
+          // For medium queries (3-7 words), keep the original threshold
         }
+
+        console.log(`[searchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`);
 
         // Search the user's knowledge base
         const searchResults = await searchKnowledgeBase(
@@ -79,6 +84,8 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
             includeMetadata: true,
           },
         );
+
+        console.log(`[searchKnowledge] Search completed. Found ${searchResults.length} results`);
 
         // If no results found
         if (searchResults.length === 0) {
@@ -163,6 +170,13 @@ import { getUserDocumentChunks } from '@/lib/db/queries';
 async function userHasDocuments(userId: string): Promise<boolean> {
   try {
     const chunks = await getUserDocumentChunks(userId);
+    console.log(`[userHasDocuments] User ${userId} has ${chunks.length} document chunks`);
+    
+    if (chunks.length > 0) {
+      const chunksWithEmbeddings = chunks.filter(chunk => chunk.embedding && Array.isArray(chunk.embedding));
+      console.log(`[userHasDocuments] ${chunksWithEmbeddings.length} chunks have valid embeddings`);
+    }
+    
     return chunks.length > 0;
   } catch (error) {
     console.error('Error checking user documents:', error);

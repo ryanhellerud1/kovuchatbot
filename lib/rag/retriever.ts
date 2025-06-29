@@ -37,11 +37,15 @@ export async function searchKnowledgeBase(
   const { limit = 10, minSimilarity = 0.4, includeMetadata = true } = options;
 
   try {
+    console.log(`[searchKnowledgeBase] Starting search for user ${userId} with query: "${query}"`);
+    
     // Generate embedding for the search query
     const queryEmbedding = await generateEmbedding(query);
+    console.log(`[searchKnowledgeBase] Generated query embedding with ${queryEmbedding.length} dimensions`);
 
     // Get all user's document chunks with embeddings
     const chunks = await getUserDocumentChunks(userId);
+    console.log(`[searchKnowledgeBase] Retrieved ${chunks.length} chunks from database`);
 
     if (chunks.length === 0) {
       return [];
@@ -49,10 +53,13 @@ export async function searchKnowledgeBase(
 
     // Calculate similarity scores
     const results: SearchResult[] = [];
+    let validChunks = 0;
+    let invalidChunks = 0;
 
     for (const chunk of chunks) {
       if (!chunk.embedding) {
         console.warn(`Chunk ${chunk.id} has no embedding, skipping`);
+        invalidChunks++;
         continue;
       }
 
@@ -60,8 +67,11 @@ export async function searchKnowledgeBase(
       const chunkEmbedding = chunk.embedding as number[] | null;
       if (!Array.isArray(chunkEmbedding)) {
         console.warn(`Chunk ${chunk.id} has invalid embedding format`);
+        invalidChunks++;
         continue;
       }
+
+      validChunks++;
 
       // Calculate similarity
       const similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
@@ -80,6 +90,14 @@ export async function searchKnowledgeBase(
           metadata: includeMetadata ? chunk.chunkMetadata : undefined,
         });
       }
+    }
+
+    console.log(`[searchKnowledgeBase] Processed ${validChunks} valid chunks, ${invalidChunks} invalid chunks`);
+    console.log(`[searchKnowledgeBase] Found ${results.length} results above similarity threshold ${minSimilarity}`);
+    
+    if (results.length > 0) {
+      const similarities = results.map(r => r.similarity);
+      console.log(`[searchKnowledgeBase] Similarity range: ${Math.min(...similarities).toFixed(3)} - ${Math.max(...similarities).toFixed(3)}`);
     }
 
     // Sort by similarity (highest first) and limit results
