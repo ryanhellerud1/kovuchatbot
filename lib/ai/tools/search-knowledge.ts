@@ -74,16 +74,12 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
 
         console.log(`[searchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`);
 
-        // Search the user's knowledge base
-        const searchResults = await searchKnowledgeBase(
-          query,
-          session.user.id,
-          {
-            limit: validatedLimit,
-            minSimilarity: validatedSimilarity,
-            includeMetadata: true,
-          },
-        );
+        // Search the user's knowledge base using LangChain
+        const searchResults = await searchKnowledgeBase(query, session.user.id, {
+          limit: validatedLimit,
+          minSimilarity: validatedSimilarity,
+          includeMetadata: true,
+        });
 
         console.log(`[searchKnowledge] Search completed. Found ${searchResults.length} results`);
 

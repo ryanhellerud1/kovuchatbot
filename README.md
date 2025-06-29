@@ -55,6 +55,34 @@ This template is configured to use custom **Kovu AI** models out of the box:
 - **Kovu AI Deep Think**: An advanced model focused on complex reasoning and generation.
 - **Kovu AI with Tools**: A model with capabilities for knowledge search and executing tools.
 
+### LangChain Integration (Experimental)
+
+The project now includes experimental **LangChain** integration alongside the existing AI SDK implementation:
+
+- **GPT-3.5 Turbo (LangChain)**: OpenAI GPT-3.5 Turbo via LangChain with tool support
+- **GPT-4 (LangChain)**: OpenAI GPT-4 via LangChain with advanced reasoning
+
+To enable LangChain models:
+1. Set `LANGCHAIN_ENABLED=true` in your environment variables
+2. Ensure you have a valid `OPENAI_API_KEY` configured
+3. Select a LangChain model from the model selector
+
+### LangChain RAG System
+
+The project uses **LangChain for all RAG functionality**, providing:
+
+- **Better Text Chunking**: Uses LangChain's `RecursiveCharacterTextSplitter` for more consistent chunks
+- **Industry-Standard Processing**: LangChain document loaders for PDF, DOCX, TXT, and Markdown files
+- **Improved Embeddings**: LangChain's `OpenAIEmbeddings` for consistent embedding generation
+- **Enhanced Search**: Better similarity search with configurable thresholds
+- **PostgreSQL Integration**: Custom vector store that works with existing database schema
+
+The LangChain integration provides:
+- Industry-standard abstractions for LLM applications
+- Advanced agent capabilities with tool orchestration
+- Flexible prompt management and memory systems
+- Extensive ecosystem compatibility
+
 The underlying Vercel AI SDK makes it easy to switch to other providers like OpenAI, Anthropic, Cohere, and more with minimal code changes.
 
 ## Running Locally

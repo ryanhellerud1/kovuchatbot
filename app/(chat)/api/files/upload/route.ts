@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { auth } from '@/app/(auth)/auth';
-import { getFileType, validateFileSize } from '@/lib/rag/document-processor';
+import { getFileType, validateFileSize } from '@/lib/rag/retriever';
 
 // Enhanced file schema that supports both attachments and knowledge documents
 const AttachmentFileSchema = z.object({

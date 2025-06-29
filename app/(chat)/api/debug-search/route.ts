@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
 import { getUserDocumentChunks } from '@/lib/db/queries';
-import { generateEmbedding } from '@/lib/rag/embeddings';
+import { generateEmbedding } from '@/lib/rag/retriever';
 import { cosineSimilarity } from '@/lib/rag/similarity';
 
 export async function POST(request: NextRequest) {
