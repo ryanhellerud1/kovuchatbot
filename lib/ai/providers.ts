@@ -48,10 +48,16 @@ export const myProvider = isTestEnvironment
   ? customProvider({
       languageModels: {
         'chat-model-reasoning-qwen3': wrapLanguageModel({
-          model: openrouter(QWEN3_MODEL_NAME),
+          model: reasoningModel,
           middleware: extractReasoningMiddleware({ tagName: 'think' }),
         }),
-        'chat-model-tools': openai(TOOLS_MODEL_NAME),
+        'chat-model-tools': chatModel,
+        // Artifact models for document generation
+        'artifact-model-qwen3': artifactModel, // Use mock artifact model for tests
+        'artifact-model': artifactModel, // Use mock artifact model for tests
+      },
+      imageModels: {
+        'small-model': openai('dall-e-3'), // Use DALL-E for image generation (even in tests)
       },
     })
   : customProvider({
@@ -63,5 +69,11 @@ export const myProvider = isTestEnvironment
         }),
         // OpenAI model with tool support
         'chat-model-tools': openai(TOOLS_MODEL_NAME),
+        // Artifact models for document generation
+        'artifact-model-qwen3': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts
+        'artifact-model': openai(TOOLS_MODEL_NAME), // Fallback to OpenAI for sheets
+      },
+      imageModels: {
+        'small-model': openai('dall-e-3'), // Use DALL-E for image generation
       },
     });
