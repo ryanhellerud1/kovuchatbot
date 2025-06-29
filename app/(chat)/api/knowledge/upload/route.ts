@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { put } from '@vercel/blob';
 
 import { auth } from '@/app/(auth)/auth';
-import { processDocument, getFileType, validateFileSize } from '@/lib/rag/document-processor';
+import { processDocument, getFileType, validateFileSize } from '@/lib/rag/retriever';
 import { saveKnowledgeDocument, saveDocumentChunk } from '@/lib/db/queries';
 import { generateUUID } from '@/lib/utils';
 
@@ -112,8 +112,8 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
     // Convert file to buffer for processing
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    // Process document with RAG pipeline
-    console.log(`Processing document with RAG pipeline: ${filename}`);
+    // Process document with LangChain RAG pipeline
+    console.log(`Processing document with LangChain RAG pipeline: ${filename}`);
     const processedDocument = await processDocument(fileBuffer, filename, fileType);
     console.log(`Document processed. Chunks: ${processedDocument.chunks.length}`);
 
@@ -149,6 +149,7 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
         processedAt: new Date().toISOString(),
         chunkCount: processedDocument.chunks.length,
         embeddingModel: 'text-embedding-3-small',
+        processedWithLangChain: true,
       },
     });
     console.log('Knowledge document metadata saved.', savedDocument.id);
@@ -161,7 +162,10 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
         chunkIndex: index,
         content: chunk.content,
         embedding: processedDocument.embeddings[index],
-        metadata: chunk.metadata,
+        metadata: {
+          ...chunk.metadata,
+          processedWithLangChain: true,
+        },
       });
     });
 

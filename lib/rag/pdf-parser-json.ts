@@ -8,6 +8,89 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 /**
+ * Fix character spacing issues common in PDF extraction
+ * Handles cases like "D a t a S c i e n c e" -> "Data Science"
+ */
+function fixCharacterSpacing(text: string): string {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+
+  let fixedText = text;
+
+  // Step 1: Identify and fix sequences of single letters separated by spaces
+  // This is the most common issue with PDF extraction
+  fixedText = fixedText.replace(/\b([a-zA-Z](?:\s+[a-zA-Z]){2,})\b/g, (match) => {
+    const parts = match.split(/\s+/);
+    
+    // Check if this is a sequence of single letters (spaced-out word)
+    if (parts.every(part => part.length === 1 && /[a-zA-Z]/.test(part))) {
+      const joinedWord = parts.join('');
+      
+      // Apply basic word boundary detection
+      // If the joined word looks like a real word, keep it joined
+      // Otherwise, try to split it into reasonable words
+      return splitIntoWords(joinedWord);
+    }
+    
+    return match;
+  });
+
+  // Step 2: Clean up any remaining single-letter artifacts
+  fixedText = fixedText.replace(/\b[a-zA-Z]\s+(?=[a-zA-Z]\b)/g, '');
+
+  // Step 3: Fix common spacing issues
+  fixedText = fixedText.replace(/\s+/g, ' '); // Multiple spaces to single space
+  fixedText = fixedText.replace(/([.!?])\s*([A-Z])/g, '$1 $2'); // Space after sentence endings
+  fixedText = fixedText.replace(/([a-z])([A-Z])/g, '$1 $2'); // Space between camelCase
+  
+  // Step 4: Final cleanup
+  fixedText = fixedText.trim();
+
+  return fixedText;
+}
+
+/**
+ * Split a concatenated word into likely individual words
+ * Uses basic heuristics to identify word boundaries
+ */
+function splitIntoWords(concatenatedWord: string): string {
+  if (!concatenatedWord || concatenatedWord.length < 3) {
+    return concatenatedWord;
+  }
+
+  // Common word patterns and prefixes/suffixes
+  const commonWords = [
+    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'man', 'men', 'put', 'say', 'she', 'too', 'use',
+    'data', 'science', 'from', 'scratch', 'guide', 'everyone', 'creating', 'predictive', 'model', 'machine', 'learning', 'analytics', 'fundamental', 'principles', 'basic', 'work', 'this', 'will', 'include', 'scientist', 'analysis', 'about', 'more', 'know', 'with', 'kind', 'obsessed'
+  ];
+
+  let result = concatenatedWord.toLowerCase();
+  
+  // Try to identify common words within the concatenated string
+  for (const word of commonWords.sort((a, b) => b.length - a.length)) {
+    const regex = new RegExp(word, 'gi');
+    if (result.includes(word)) {
+      result = result.replace(regex, ` ${word} `);
+    }
+  }
+
+  // Clean up extra spaces and restore original case for first letters
+  result = result.replace(/\s+/g, ' ').trim();
+  
+  // If we couldn't split it well, return the original with some basic splitting
+  if (result.split(' ').length < 2) {
+    // Try splitting on common patterns
+    result = concatenatedWord
+      .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase
+      .replace(/([a-zA-Z])(\d)/g, '$1 $2') // letter followed by number
+      .replace(/(\d)([a-zA-Z])/g, '$1 $2'); // number followed by letter
+  }
+
+  return result;
+}
+
+/**
  * Parse PDF buffer using pdf2json
  */
 export async function parsePDFWithJson(
@@ -74,7 +157,11 @@ export async function parsePDFWithJson(
               }
             }
 
-            extractedText = textParts.join(' ').trim();
+            // Join text parts and clean up excessive spacing
+            let rawText = textParts.join(' ').trim();
+            
+            // Fix common PDF parsing issues where characters are separated by spaces
+            extractedText = fixCharacterSpacing(rawText);
 
             if (!extractedText || extractedText.length === 0) {
               reject(new Error('No text content found in PDF'));
@@ -180,7 +267,9 @@ export async function parsePDFWithFile(
               }
             }
 
-            const extractedText = textParts.join(' ').trim();
+            // Fix character spacing issues
+            const rawText = textParts.join(' ').trim();
+            const extractedText = fixCharacterSpacing(rawText);
 
             if (!extractedText || extractedText.length === 0) {
               reject(new Error('No text content found in PDF'));

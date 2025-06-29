@@ -17,4 +17,15 @@ export const chatModels: Array<ChatModel> = [
     name: 'Kovu AI with Tools',
     description: 'Kovu AI with knowledge search and tool capabilities',
   },
+  // LangChain models (experimental)
+  {
+    id: 'langchain-gpt-3.5-turbo',
+    name: 'GPT-3.5 Turbo (LangChain)',
+    description: 'OpenAI GPT-3.5 Turbo via LangChain with tool support',
+  },
+  {
+    id: 'langchain-gpt-4',
+    name: 'GPT-4 (LangChain)',
+    description: 'OpenAI GPT-4 via LangChain with advanced reasoning',
+  },
 ];
