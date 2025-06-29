@@ -28,6 +28,8 @@ interface KnowledgeDocumentDisplay {
   updatedAt: Date;
   metadata?: any;
   hasFileUrl: boolean;
+  summary: string;
+  firstPageContent: string;
 }
 
 interface KnowledgeDocumentsProps {
@@ -151,6 +153,8 @@ export function KnowledgeDocuments({
                     )}
                   </div>
                   
+                  <p className="text-sm text-muted-foreground mt-1">{document.summary}</p>
+
                   <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
                     <div className="flex items-center space-x-1">
                       <HardDrive className="h-3 w-3" />

@@ -18,7 +18,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   }
 
   const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
-  
+
   if (magnitude === 0) {
     return 0;
   }
@@ -32,10 +32,10 @@ export function cosineSimilarity(a: number[], b: number[]): number {
  */
 export function calculateSimilarities(
   queryVector: number[],
-  documentVectors: number[][]
+  documentVectors: number[][],
 ): number[] {
-  return documentVectors.map(docVector => 
-    cosineSimilarity(queryVector, docVector)
+  return documentVectors.map((docVector) =>
+    cosineSimilarity(queryVector, docVector),
   );
 }
 
@@ -46,10 +46,10 @@ export function calculateSimilarities(
 export function findTopSimilar(
   queryVector: number[],
   documentVectors: number[][],
-  k: number = 5
+  k: number = 5,
 ): Array<{ index: number; similarity: number }> {
   const similarities = calculateSimilarities(queryVector, documentVectors);
-  
+
   return similarities
     .map((similarity, index) => ({ index, similarity }))
     .sort((a, b) => b.similarity - a.similarity)
@@ -62,9 +62,9 @@ export function findTopSimilar(
 export function filterBySimilarity<T>(
   items: T[],
   similarities: number[],
-  threshold: number = 0.7
+  threshold: number = 0.4,
 ): Array<T & { similarity: number }> {
   return items
     .map((item, index) => ({ ...item, similarity: similarities[index] }))
-    .filter(item => item.similarity >= threshold);
+    .filter((item) => item.similarity >= threshold);
 }
