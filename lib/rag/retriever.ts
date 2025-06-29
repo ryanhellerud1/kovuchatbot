@@ -25,10 +25,10 @@ export interface LangChainRAGConfig {
 }
 
 const DEFAULT_CONFIG: LangChainRAGConfig = {
-  chunkSize: 1000,
-  chunkOverlap: 200,
+  chunkSize: 1500,      // Increased chunk size for better context
+  chunkOverlap: 300,    // Increased overlap to maintain context between chunks
   embeddingModel: 'text-embedding-3-small',
-  similarityThreshold: 0.4,
+  similarityThreshold: 0.25, // Much lower default threshold for comprehensive results
 };
 
 /**
@@ -277,11 +277,28 @@ export async function processDocument(
       throw new Error('No text content found in document');
     }
 
-    // Split text using LangChain's text splitter
+    // Split text using LangChain's text splitter with improved chunking strategy
     const textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: finalConfig.chunkSize!,
       chunkOverlap: finalConfig.chunkOverlap!,
-      separators: ['\n\n', '\n', ' ', ''],
+      // Use more natural text boundaries for chunking
+      separators: [
+        "\n## ", // Markdown headers
+        "\n### ",
+        "\n#### ",
+        "\n\n", // Paragraphs
+        "\n", // Lines
+        ". ", // Sentences
+        "! ",
+        "? ",
+        "; ",
+        ":", // Clauses
+        ", ", // Phrases
+        " ", // Words
+        "" // Characters
+      ],
+      // Keep semantically meaningful chunks
+      keepSeparator: true,
     });
 
     const documents = await textSplitter.createDocuments([fullContent], [{ 
@@ -368,6 +385,7 @@ export interface SearchResult {
     chunkIndex: number;
   };
   metadata?: any;
+  keywordBoost?: number; // Added to track keyword boosting
 }
 
 /**
@@ -382,28 +400,109 @@ export interface SearchOptions {
 /**
  * LangChain-based knowledge search (replaces legacy searchKnowledgeBase)
  */
+/**
+ * Preprocess query to improve search quality
+ */
+function preprocessQuery(query: string): string {
+  // Remove extra whitespace
+  let processedQuery = query.trim().replace(/\s+/g, ' ');
+  
+  // Remove common filler words that don't add semantic meaning
+  const fillerWords = /\b(the|a|an|and|or|but|is|are|was|were|be|been|being|in|on|at|to|for|with|by|about|like|through|over|before|after|since|during)\b/gi;
+  processedQuery = processedQuery.replace(fillerWords, ' ').replace(/\s+/g, ' ').trim();
+  
+  return processedQuery;
+}
+
+/**
+ * Generate query variations to improve recall
+ */
+function generateQueryVariations(query: string): string[] {
+  const variations: string[] = [query];
+  const words = query.split(/\s+/);
+  
+  // Add variations without question words
+  if (/^(what|how|why|when|where|who|which)\b/i.test(query)) {
+    variations.push(query.replace(/^(what|how|why|when|where|who|which)\s+/i, ''));
+  }
+  
+  // For longer queries, add a version with just the key terms
+  if (words.length > 4) {
+    // Remove common words and keep only potential keywords
+    const keywords = words.filter(word => 
+      word.length > 3 && 
+      !/^(what|how|why|when|where|who|which|about|should|could|would|will|have|this|that|these|those|they|their|there)$/i.test(word)
+    );
+    
+    if (keywords.length > 1) {
+      variations.push(keywords.join(' '));
+    }
+  }
+  
+  return variations;
+}
+
 export async function searchKnowledgeBase(
   query: string,
   userId: string,
   options: SearchOptions = {}
 ): Promise<SearchResult[]> {
-  const { limit = 10, minSimilarity = 0.4, includeMetadata = true } = options;
+  const { limit = 15, minSimilarity = 0.25, includeMetadata = true } = options;
 
   try {
     console.log(`[LangChain] Starting search for user ${userId} with query: "${query}"`);
+    
+    // Preprocess the query
+    const processedQuery = preprocessQuery(query);
+    console.log(`[LangChain] Processed query: "${processedQuery}"`);
+    
+    // Generate query variations for better recall
+    const queryVariations = generateQueryVariations(processedQuery);
+    if (queryVariations.length > 1) {
+      console.log(`[LangChain] Generated ${queryVariations.length} query variations`);
+    }
     
     const embeddings = new OpenAIEmbeddings({
       modelName: 'text-embedding-3-small',
     });
 
     const vectorStore = new SimplePostgreSQLVectorStore(embeddings, userId);
-    const results = await vectorStore.similaritySearchWithScore(query, limit * 2); // Get more to filter
-
-    console.log(`[LangChain] Retrieved ${results.length} initial results`);
+    
+    // Search with the main query - fetch more results to have better selection
+    const mainResults = await vectorStore.similaritySearchWithScore(processedQuery, limit * 3);
+    console.log(`[LangChain] Retrieved ${mainResults.length} results for main query`);
+    
+    // If we have variations and not enough good results, search with variations too
+    let allResults = [...mainResults];
+    const goodMainResults = mainResults.filter(([, score]) => score >= minSimilarity);
+    
+    if (queryVariations.length > 1 && goodMainResults.length < limit) {
+      // Only search with variations if we need more results
+      for (let i = 1; i < queryVariations.length && goodMainResults.length < limit; i++) {
+        const variationResults = await vectorStore.similaritySearchWithScore(queryVariations[i], limit * 2);
+        console.log(`[LangChain] Retrieved ${variationResults.length} results for variation "${queryVariations[i]}"`);
+        allResults = [...allResults, ...variationResults];
+      }
+    }
+    
+    // Deduplicate results by document content
+    const seenContents = new Set<string>();
+    const uniqueResults: Array<[Document, number]> = [];
+    
+    for (const result of allResults) {
+      const contentHash = result[0].pageContent.substring(0, 100); // Use first 100 chars as a simple hash
+      if (!seenContents.has(contentHash)) {
+        seenContents.add(contentHash);
+        uniqueResults.push(result);
+      }
+    }
+    
+    console.log(`[LangChain] Deduplicated to ${uniqueResults.length} unique results`);
 
     // Filter by similarity threshold and format results
-    const filteredResults = results
+    const filteredResults = uniqueResults
       .filter(([, score]) => score >= minSimilarity)
+      .sort((a, b) => b[1] - a[1]) // Sort by similarity score
       .slice(0, limit)
       .map(([document, score]) => ({
         id: document.metadata.id || 'unknown',
@@ -423,11 +522,186 @@ export async function searchKnowledgeBase(
       const similarities = filteredResults.map(r => r.similarity);
       console.log(`[LangChain] Similarity range: ${Math.min(...similarities).toFixed(3)} - ${Math.max(...similarities).toFixed(3)}`);
     }
+    
+    // Implement keyword boosting for exact matches
+    const boostedResults = boostExactMatches(query, filteredResults);
+    
+    // For highly relevant results, try to include adjacent chunks for more context
+    const enhancedResults = await enhanceWithAdjacentChunks(boostedResults, userId);
 
-    return filteredResults;
+    return enhancedResults;
   } catch (error) {
     console.error('[LangChain] Error searching knowledge base:', error);
     throw new Error('Failed to search knowledge base');
+  }
+}
+
+/**
+ * Boost results that contain exact keyword matches
+ */
+function boostExactMatches(query: string, results: SearchResult[]): SearchResult[] {
+  if (!results.length) return results;
+  
+  // Extract important keywords from the query
+  const keywords = extractKeywords(query);
+  if (!keywords.length) return results;
+  
+  console.log(`[LangChain] Boosting results for keywords: ${keywords.join(', ')}`);
+  
+  // Clone results to avoid modifying the original
+  const boostedResults = [...results];
+  
+  // Calculate boost for each result
+  for (const result of boostedResults) {
+    let keywordBoost = 0;
+    const content = result.content.toLowerCase();
+    
+    // Check for exact keyword matches
+    for (const keyword of keywords) {
+      // Skip very short keywords
+      if (keyword.length < 4) continue;
+      
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(content)) {
+        // Boost based on keyword length and position
+        const position = content.indexOf(keyword.toLowerCase());
+        const positionFactor = position < 100 ? 0.05 : 0.02; // Higher boost for matches at beginning
+        keywordBoost += Math.min(0.1, keyword.length * 0.005) + positionFactor;
+      }
+    }
+    
+    // Apply boost (max 0.2 to avoid overwhelming semantic similarity)
+    if (keywordBoost > 0) {
+      const cappedBoost = Math.min(0.2, keywordBoost);
+      result.similarity = Math.min(0.99, result.similarity + cappedBoost);
+      result.keywordBoost = cappedBoost;
+    }
+  }
+  
+  // Re-sort based on boosted similarity
+  boostedResults.sort((a, b) => b.similarity - a.similarity);
+  
+  return boostedResults;
+}
+
+/**
+ * Extract important keywords from a query
+ */
+function extractKeywords(query: string): string[] {
+  // Remove quotes and special characters
+  const cleanQuery = query.replace(/["']/g, '').replace(/[^\w\s]/g, ' ');
+  
+  // Split into words
+  const words = cleanQuery.toLowerCase().split(/\s+/);
+  
+  // Filter out common words and short words
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about', 'like', 'through', 'over', 'before',
+    'after', 'since', 'during', 'this', 'that', 'these', 'those', 'they', 'them', 'their',
+    'what', 'which', 'who', 'whom', 'whose', 'when', 'where', 'why', 'how', 'all', 'any',
+    'both', 'each', 'few', 'more', 'most', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
+    'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now'
+  ]);
+  
+  return words.filter(word => 
+    word.length > 2 && !stopWords.has(word)
+  );
+}
+
+/**
+ * Enhance highly relevant results by including adjacent chunks for more context
+ */
+async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string): Promise<SearchResult[]> {
+  if (!results.length) return results;
+  
+  // Only enhance results with high similarity scores
+  const highRelevanceThreshold = 0.6;
+  const enhancedResults: SearchResult[] = [];
+  
+  for (const result of results) {
+    enhancedResults.push(result);
+    
+    // For highly relevant results, try to get adjacent chunks
+    if (result.similarity >= highRelevanceThreshold) {
+      try {
+        const adjacentChunks = await getAdjacentChunks(
+          result.source.documentId, 
+          result.source.chunkIndex, 
+          userId
+        );
+        
+        // Add adjacent chunks as separate results with lower similarity
+        for (const chunk of adjacentChunks) {
+          const adjacentResult: SearchResult = {
+            id: `${result.id}_adjacent_${chunk.chunkIndex}`,
+            content: chunk.content,
+            similarity: Math.max(0.1, result.similarity - 0.2), // Lower similarity for context
+            source: {
+              documentId: result.source.documentId,
+              documentTitle: result.source.documentTitle,
+              chunkIndex: chunk.chunkIndex,
+            },
+            metadata: {
+              ...result.metadata,
+              isAdjacentContext: true,
+              originalChunkIndex: result.source.chunkIndex,
+            },
+          };
+          enhancedResults.push(adjacentResult);
+        }
+      } catch (error) {
+        console.warn(`[enhanceWithAdjacentChunks] Failed to get adjacent chunks for ${result.id}:`, error);
+      }
+    }
+  }
+  
+  // Sort by similarity again and limit to reasonable number
+  return enhancedResults
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 20); // Allow more results with context
+}
+
+/**
+ * Get adjacent chunks from the same document
+ */
+async function getAdjacentChunks(
+  documentId: string, 
+  chunkIndex: number, 
+  userId: string
+): Promise<Array<{ content: string; chunkIndex: number }>> {
+  try {
+    const allChunks = await getUserDocumentChunks(userId);
+    
+    // Filter chunks from the same document
+    const documentChunks = allChunks
+      .filter(chunk => chunk.documentId === documentId)
+      .sort((a, b) => a.chunkIndex - b.chunkIndex);
+    
+    const adjacentChunks: Array<{ content: string; chunkIndex: number }> = [];
+    
+    // Get previous chunk
+    const prevChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex - 1);
+    if (prevChunk) {
+      adjacentChunks.push({
+        content: prevChunk.content,
+        chunkIndex: prevChunk.chunkIndex,
+      });
+    }
+    
+    // Get next chunk
+    const nextChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex + 1);
+    if (nextChunk) {
+      adjacentChunks.push({
+        content: nextChunk.content,
+        chunkIndex: nextChunk.chunkIndex,
+      });
+    }
+    
+    return adjacentChunks;
+  } catch (error) {
+    console.error('[getAdjacentChunks] Error:', error);
+    return [];
   }
 }
 

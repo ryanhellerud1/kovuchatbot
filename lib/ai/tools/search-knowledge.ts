@@ -25,12 +25,12 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
       limit: z
         .number()
         .optional()
-        .default(5)
-        .describe('Maximum number of results to return (1-10)'),
+        .default(8)
+        .describe('Maximum number of results to return (1-15)'),
       minSimilarity: z
         .number()
         .optional()
-        .default(0.4)
+        .default(0.25)
         .describe('Minimum similarity threshold (0.0-1.0)'),
       dynamicThreshold: z
         .boolean()
@@ -40,8 +40,8 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
     }),
     execute: async ({
       query,
-      limit = 5,
-      minSimilarity = 0.4,
+      limit = 8,
+      minSimilarity = 0.25,
       dynamicThreshold = true,
     }) => {
       // Ensure user is authenticated
@@ -56,20 +56,40 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
         console.log(`[searchKnowledge] Starting search for query: "${query}"`);
         
         // Validate parameters
-        const validatedLimit = Math.min(Math.max(limit, 1), 10);
+        const validatedLimit = Math.min(Math.max(limit, 1), 15);
         let validatedSimilarity = Math.min(Math.max(minSimilarity, 0.0), 1.0);
 
-        // Adjust threshold dynamically based on query length
+        // Adjust threshold dynamically based on query characteristics
         if (dynamicThreshold) {
           const queryTokens = query.split(/\s+/).length;
+          const hasSpecificTerms = /\b(what|how|why|when|where|who|which)\b/i.test(query);
+          const hasQuotes = query.includes('"') || query.includes('"') || query.includes('"');
+          
+          // Much more aggressive threshold reduction for comprehensive results
           if (queryTokens < 3) {
-            // Broader search for short queries
-            validatedSimilarity = Math.max(0.3, validatedSimilarity - 0.1);
-          } else if (queryTokens > 7) {
-            // Only increase threshold for very long queries (8+ words)
-            validatedSimilarity = Math.min(0.5, validatedSimilarity + 0.05);
+            // Very broad search for short queries
+            validatedSimilarity = Math.max(0.15, validatedSimilarity - 0.25);
+          } else if (queryTokens < 5) {
+            // Broader search for short-medium queries
+            validatedSimilarity = Math.max(0.18, validatedSimilarity - 0.2);
+          } else if (queryTokens < 8) {
+            // Still broader for medium queries
+            validatedSimilarity = Math.max(0.2, validatedSimilarity - 0.15);
+          } else {
+            // Only slightly increase threshold for very long queries
+            validatedSimilarity = Math.min(0.4, validatedSimilarity + 0.05);
           }
-          // For medium queries (3-7 words), keep the original threshold
+          
+          // Further adjust based on query characteristics
+          if (hasSpecificTerms) {
+            // Questions often need much broader search
+            validatedSimilarity = Math.max(0.15, validatedSimilarity - 0.08);
+          }
+          
+          if (hasQuotes) {
+            // Quoted searches indicate user wants exact matches
+            validatedSimilarity = Math.max(0.15, validatedSimilarity - 0.12);
+          }
         }
 
         console.log(`[searchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`);
@@ -115,7 +135,7 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
           }
         }
 
-        // Format results for the AI
+        // Format results for the AI with enhanced detail
         const formattedResults = searchResults.map(
           (result: SearchResult, index: number) => ({
             rank: index + 1,
@@ -127,6 +147,10 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
               section: `Chunk ${result.source.chunkIndex + 1}`,
             },
             relevanceScore: getRelevanceLabel(result.similarity),
+            keywordBoost: result.keywordBoost ? Math.round(result.keywordBoost * 100) / 100 : undefined,
+            contentLength: result.content.length,
+            // Add preview of content for better context
+            preview: result.content.length > 200 ? result.content.substring(0, 200) + '...' : result.content,
           }),
         );
 
@@ -209,10 +233,11 @@ async function getSearchSuggestions(query: string): Promise<string[]> {
  * Get a human-readable relevance label based on similarity score
  */
 function getRelevanceLabel(similarity: number): string {
-  if (similarity >= 0.8) return 'Highly Relevant';
-  if (similarity >= 0.65) return 'Very Relevant';
-  if (similarity >= 0.5) return 'Relevant';
+  if (similarity >= 0.75) return 'Highly Relevant';
+  if (similarity >= 0.6) return 'Very Relevant';
+  if (similarity >= 0.45) return 'Relevant';
   if (similarity >= 0.3) return 'Somewhat Relevant';
+  if (similarity >= 0.2) return 'Potentially Relevant';
   return 'Low Relevance';
 }
 
@@ -227,7 +252,8 @@ function createSearchSummary(query: string, results: any[]): string {
   const documentTitles = Array.from(
     new Set(results.map((r) => r.source.document)),
   );
-  const highRelevanceCount = results.filter((r) => r.similarity >= 0.8).length;
+  const highRelevanceCount = results.filter((r) => r.similarity >= 0.6).length;
+  const veryRelevantCount = results.filter((r) => r.similarity >= 0.45).length;
 
   let summary = `Found ${results.length} relevant result${results.length === 1 ? '' : 's'} for "${query}"`;
 
@@ -238,7 +264,13 @@ function createSearchSummary(query: string, results: any[]): string {
   }
 
   if (highRelevanceCount > 0) {
-    summary += `. ${highRelevanceCount} result${highRelevanceCount === 1 ? ' is' : 's are'} highly relevant.`;
+    summary += `. ${highRelevanceCount} result${highRelevanceCount === 1 ? ' is' : 's are'} highly relevant`;
+    if (veryRelevantCount > highRelevanceCount) {
+      summary += ` and ${veryRelevantCount - highRelevanceCount} additional result${veryRelevantCount - highRelevanceCount === 1 ? ' is' : 's are'} very relevant`;
+    }
+    summary += '.';
+  } else if (veryRelevantCount > 0) {
+    summary += `. ${veryRelevantCount} result${veryRelevantCount === 1 ? ' is' : 's are'} very relevant.`;
   }
 
   return summary;
