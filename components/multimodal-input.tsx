@@ -130,6 +130,11 @@ function PureMultimodalInput({
     const formData = new FormData();
     formData.append('file', file);
 
+    // Add type parameter to help server determine upload handling
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const isKnowledgeDocument = ['.pdf', '.docx', '.txt', '.md', '.markdown'].includes(fileExtension);
+    formData.append('type', isKnowledgeDocument ? 'knowledge' : 'attachment');
+
     try {
       const response = await fetch('/api/files/upload', {
         method: 'POST',
@@ -138,7 +143,12 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType } = data;
+        const { url, pathname, contentType, size } = data;
+
+        // Show success message for large files
+        if (size && size > 4.5 * 1024 * 1024) {
+          toast.success(`Large file uploaded successfully (${(size / 1024 / 1024).toFixed(1)}MB)`);
+        }
 
         return {
           url,
@@ -149,6 +159,7 @@ function PureMultimodalInput({
       const { error } = await response.json();
       toast.error(error);
     } catch (error) {
+      console.error('Upload error:', error);
       toast.error('Failed to upload file, please try again!');
     }
   };

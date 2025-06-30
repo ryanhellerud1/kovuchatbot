@@ -529,7 +529,7 @@ function diversifyResultsByDocument(results: SearchResult[], targetLimit: number
     if (!resultsByDocument.has(docId)) {
       resultsByDocument.set(docId, []);
     }
-    resultsByDocument.get(docId)!.push(result);
+    resultsByDocument.get(docId)?.push(result);
   }
   
   // If we only have one document, return top results
@@ -659,7 +659,7 @@ async function getAdjacentChunks(
   documentId: string, 
   chunkIndex: number, 
   userId: string,
-  range: number = 1
+  range = 1
 ): Promise<Array<{ content: string; chunkIndex: number }>> {
   try {
     const allChunks = await getUserDocumentChunks(userId);
@@ -781,13 +781,23 @@ export function getFileType(fileName: string): SupportedFileType | null {
 }
 
 /**
- * Validate file size (max 10MB) (compatible with legacy)
+ * Validate file size with blob storage support (max 50MB) (compatible with legacy)
+ * @deprecated Use lib/blob-storage.ts utilities instead
  */
 export function validateFileSize(
   fileSize: number,
-  maxSize: number = 10 * 1024 * 1024,
+  maxSize: number = 50 * 1024 * 1024, // Increased to 50MB for blob storage
 ): boolean {
   return fileSize <= maxSize;
+}
+
+/**
+ * Check if file should use blob storage based on size
+ * @deprecated Use lib/blob-storage.ts utilities instead
+ */
+export function shouldUseBlobStorage(fileSize: number): boolean {
+  const blobThreshold = 4.5 * 1024 * 1024; // 4.5MB
+  return fileSize > blobThreshold;
 }
 
 /**

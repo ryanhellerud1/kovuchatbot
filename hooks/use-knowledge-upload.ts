@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 
-interface KnowledgeDocument {
+export interface KnowledgeDocument {
   id: string;
   title: string;
   fileType: string;
@@ -52,10 +52,10 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
         throw new Error('Unsupported file type. Please upload PDF, DOCX, TXT, or Markdown files.');
       }
 
-      // Validate file size (4.5MB limit)
-      const maxSize = 4.5 * 1024 * 1024; // 4.5MB
+      // Validate file size (15MB limit for knowledge documents)
+      const maxSize = 15 * 1024 * 1024; // 15MB
       if (file.size > maxSize) {
-        throw new Error('File size must be less than 4.5MB.');
+        throw new Error('File size must be less than 15MB for knowledge documents.');
       }
 
       setUploadProgress(10);
@@ -63,7 +63,12 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
       // Create form data
       const formData = new FormData();
       formData.append('file', file);
-      if (options.saveToBlob) {
+      
+      // Automatically use blob storage for files larger than 4.5MB
+      const blobThreshold = 4.5 * 1024 * 1024; // 4.5MB
+      const shouldUseBlob = options.saveToBlob || file.size > blobThreshold;
+      
+      if (shouldUseBlob) {
         formData.append('saveToBlob', 'true');
       }
 

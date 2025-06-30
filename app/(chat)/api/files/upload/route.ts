@@ -1,16 +1,24 @@
-import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { auth } from '@/app/(auth)/auth';
-import { getFileType, validateFileSize } from '@/lib/rag/retriever';
+import { getFileType } from '@/lib/rag/retriever';
+import { 
+  validateFileSize, 
+  validateKnowledgeDocumentSize,
+  shouldUseBlobStorage, 
+  uploadToBlob, 
+  getBlobFolder,
+  formatFileSize,
+  BlobStorageError 
+} from '@/lib/blob-storage';
 
 // Enhanced file schema that supports both attachments and knowledge documents
 const AttachmentFileSchema = z.object({
   file: z
     .instanceof(Blob)
-    .refine((file) => file.size <= 5 * 1024 * 1024, {
-      message: 'File size should be less than 5MB',
+    .refine((file) => file.size <= 50 * 1024 * 1024, {
+      message: 'File size should be less than 50MB',
     })
     .refine((file) => ['image/jpeg', 'image/png'].includes(file.type), {
       message: 'File type should be JPEG or PNG',
@@ -20,8 +28,8 @@ const AttachmentFileSchema = z.object({
 const KnowledgeFileSchema = z.object({
   file: z
     .instanceof(Blob)
-    .refine((file) => validateFileSize(file.size), {
-      message: 'File size should be less than 10MB',
+    .refine((file) => validateKnowledgeDocumentSize(file.size), {
+      message: 'File size should be less than 15MB for knowledge documents',
     })
     .refine((file) => {
       const supportedTypes = [
@@ -65,7 +73,7 @@ export async function POST(request: Request) {
       (uploadType === 'auto' && fileType !== null);
 
     // Validate file based on upload type
-    let validatedFile;
+    let validatedFile: { success: boolean; error?: any };
     if (isKnowledgeDocument) {
       validatedFile = KnowledgeFileSchema.safeParse({ file });
       if (!validatedFile.success) {
@@ -84,7 +92,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const fileBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
 
     // If it's a knowledge document, redirect to knowledge upload endpoint
     if (isKnowledgeDocument) {
@@ -121,13 +129,39 @@ export async function POST(request: Request) {
 
     // Handle regular attachment upload
     try {
-      const data = await put(`attachments/${filename}`, fileBuffer, {
+      console.log(`Uploading attachment (size: ${formatFileSize(file.size)})`);
+      
+      const blobFolder = getBlobFolder('attachment');
+      const data = await uploadToBlob(fileBuffer, filename, blobFolder, {
         access: 'public',
+        addRandomSuffix: true,
       });
 
-      return NextResponse.json(data);
+      // Return data in expected format
+      return NextResponse.json({
+        url: data.url,
+        pathname: data.pathname,
+        contentType: file.type,
+        size: file.size,
+      });
     } catch (error) {
-      return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+      console.error('Attachment upload error:', error);
+      
+      // Provide more specific error message for large files
+      if (shouldUseBlobStorage(file.size)) {
+        return NextResponse.json(
+          { 
+            error: 'Failed to upload large file to storage',
+            details: error instanceof BlobStorageError ? error.message : 'Unknown error'
+          }, 
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({ 
+        error: 'Upload failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
     }
   } catch (error) {
     console.error('Upload error:', error);

@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { put } from '@vercel/blob';
 
 import { auth } from '@/app/(auth)/auth';
-import { processDocument, getFileType, validateFileSize } from '@/lib/rag/retriever';
+import { processDocument, getFileType } from '@/lib/rag/retriever';
 import { saveKnowledgeDocument, saveDocumentChunk } from '@/lib/db/queries';
 import { generateUUID } from '@/lib/utils';
+import { 
+  validateKnowledgeDocumentSize, 
+  shouldUseBlobStorage, 
+  uploadToBlob, 
+  getBlobFolder,
+  formatFileSize,
+  BlobStorageError,
+} from '@/lib/blob-storage';
 
 /**
  * Schema for validating knowledge document uploads
@@ -13,8 +20,8 @@ import { generateUUID } from '@/lib/utils';
 const KnowledgeFileSchema = z.object({
   file: z
     .instanceof(Blob)
-    .refine((file) => validateFileSize(file.size), {
-      message: 'File size should be less than 10MB',
+    .refine((file) => validateKnowledgeDocumentSize(file.size), {
+      message: 'File size should be less than 15MB for knowledge documents',
     })
     .refine((file) => {
       // Check if file type is supported for RAG processing
@@ -117,19 +124,41 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
     const processedDocument = await processDocument(fileBuffer, filename, fileType);
     console.log(`Document processed. Chunks: ${processedDocument.chunks.length}`);
 
-    // Optional: Save original file to blob storage
+    // Determine if we should use blob storage
+    const shouldUseBlob = saveToBlob || shouldUseBlobStorage(file.size);
+    
+    // Save original file to blob storage for large files or when explicitly requested
     let fileUrl: string | undefined;
-    if (saveToBlob) {
-      console.log('Attempting to save original file to blob storage.');
+    if (shouldUseBlob) {
+      console.log(`Saving file to blob storage (size: ${formatFileSize(file.size)}).`);
       try {
-        const blobResult = await put(`knowledge/${session.user.id}/${filename}`, fileBuffer, {
-          access: 'public', // Note: Vercel Blob doesn't support private access in free tier
+        const blobFolder = getBlobFolder('knowledge', session.user.id);
+        const blobResult = await uploadToBlob(fileBuffer, filename, blobFolder, {
+          access: 'public',
+          addRandomSuffix: true,
         });
+        
         fileUrl = blobResult.url;
-        console.log('File saved to blob storage.', fileUrl);
+        console.log('File saved to blob storage:', fileUrl);
       } catch (error) {
-        console.warn('Failed to save file to blob storage:', error);
-        // Continue without blob storage - not critical for RAG functionality
+        console.error('Failed to save file to blob storage:', error);
+        
+        // For large files, blob storage is critical - fail the upload
+        if (shouldUseBlobStorage(file.size)) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: 'Failed to save large file to storage',
+              details: error instanceof BlobStorageError 
+                ? error.message 
+                : 'Large files require blob storage which is currently unavailable'
+            },
+            { status: 500 }
+          );
+        }
+        
+        // For smaller files, continue without blob storage
+        console.warn('Continuing without blob storage for smaller file');
       }
     }
 

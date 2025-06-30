@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useKnowledgeUpload, type KnowledgeDocument } from '@/hooks/use-knowledge-upload';
 import { Button } from './ui/button';
@@ -26,6 +27,32 @@ export function KnowledgeUpload({
     if (files.length === 0) return;
 
     const file = files[0];
+    
+    // Client-side validation for file size (15MB limit)
+    const maxSize = 15 * 1024 * 1024; // 15MB
+    if (file.size > maxSize) {
+      toast.error(`File "${file.name}" is too large`, {
+        description: 'Knowledge documents must be smaller than 15MB',
+      });
+      return;
+    }
+    
+    // Validate file type
+    const supportedExtensions = ['.pdf', '.docx', '.txt', '.md', '.markdown'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    if (!supportedExtensions.includes(fileExtension)) {
+      toast.error(`File type "${fileExtension}" is not supported`, {
+        description: 'Please upload PDF, DOCX, TXT, or Markdown files',
+      });
+      return;
+    }
+    
+    // Show info for large files that will use blob storage
+    const blobThreshold = 4.5 * 1024 * 1024; // 4.5MB
+    if (file.size > blobThreshold) {
+      console.log(`Uploading large file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+    }
+    
     const document = await uploadDocument(file, { saveToBlob: true });
     
     if (document && onUploadComplete) {
@@ -172,7 +199,7 @@ export function KnowledgeUpload({
             </div>
             <div className="text-xs text-muted-foreground space-y-1">
               <p>Supported formats: PDF, DOCX, TXT, Markdown</p>
-              <p>Maximum file size: 10MB</p>
+              <p>Maximum file size: 15MB</p>
             </div>
           </div>
         )}
