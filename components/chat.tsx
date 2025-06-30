@@ -58,7 +58,7 @@ export function Chat({
     }),
     onFinish: (message) => {
       console.log('[Chat] Stream finished, message:', message);
-      if (message && message.content) {
+      if (message?.content) {
         console.log('[Chat] Final message content:', message.content);
       }
       mutate(unstable_serialize(getChatHistoryPaginationKey));

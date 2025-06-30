@@ -3,7 +3,6 @@ import {
   extractReasoningMiddleware,
   wrapLanguageModel,
 } from 'ai';
-import { xai } from '@ai-sdk/xai';
 import { openai } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { isTestEnvironment } from '../constants';
@@ -11,7 +10,6 @@ import {
   artifactModel,
   chatModel,
   reasoningModel,
-  titleModel,
 } from './models.test';
 
 // Define the OpenRouter instance using the official provider

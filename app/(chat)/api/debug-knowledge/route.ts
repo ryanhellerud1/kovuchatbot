@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
 import { getUserKnowledgeDocuments, getUserDocumentChunks } from '@/lib/db/queries';
 
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         documentId: chunk.documentId,
         documentTitle: chunk.documentTitle,
         chunkIndex: chunk.chunkIndex,
-        contentPreview: chunk.content.substring(0, 100) + '...',
+        contentPreview: `${chunk.content.substring(0, 100)}...`,
         hasEmbedding: !!chunk.embedding,
         embeddingLength: Array.isArray(chunk.embedding) ? chunk.embedding.length : 0,
       })),

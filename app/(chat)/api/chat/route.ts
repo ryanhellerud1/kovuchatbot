@@ -4,7 +4,6 @@ import {
   createDataStreamResponse,
   smoothStream,
   streamText,
-  type Message,
   type StreamTextOnFinishCallback,
   type ToolSet,
 } from 'ai';

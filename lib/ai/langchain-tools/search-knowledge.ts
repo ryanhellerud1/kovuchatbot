@@ -2,7 +2,7 @@ import { StructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { searchKnowledgeBase } from '@/lib/rag/retriever';
 import { queryLangChainRAG } from '@/lib/rag/langchain-retrieval-chain';
-import { LangChainToolContext } from '../langchain-types';
+import type { LangChainToolContext } from '../langchain-types';
 import { shouldUseLangChain } from '../langchain-utils';
 
 /**

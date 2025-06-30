@@ -9,7 +9,6 @@ import {
 } from '@/lib/db/queries';
 import type { VisibilityType } from '@/components/visibility-selector';
 import { myProvider } from '@/lib/ai/providers';
-import { DEFAULT_CHAT_MODEL } from '@/lib/ai/models';
 
 export async function saveChatModelAsCookie(model: string) {
   const cookieStore = await cookies();
@@ -33,7 +32,7 @@ export async function generateTitleFromUserMessage({
     console.error('Error generating title:', error);
     // Fallback to a simple title if generation fails
     const content = typeof message.content === 'string' ? message.content : 'New Chat';
-    return content.length > 50 ? content.substring(0, 47) + '...' : content;
+    return content.length > 50 ? `${content.substring(0, 47)}...` : content;
   }
 }
 

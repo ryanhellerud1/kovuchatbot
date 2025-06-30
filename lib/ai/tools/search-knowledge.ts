@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { Session } from 'next-auth';
-import { searchKnowledgeBase, SearchResult } from '@/lib/rag/retriever';
+import type { Session } from 'next-auth';
+import { searchKnowledgeBase, type SearchResult } from '@/lib/rag/retriever';
 
 interface SearchKnowledgeProps {
   session: Session;
@@ -25,8 +25,8 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
       limit: z
         .number()
         .optional()
-        .default(8)
-        .describe('Maximum number of results to return (1-15)'),
+        .default(18)
+        .describe('Maximum number of results to return (1-25)'),
       minSimilarity: z
         .number()
         .optional()
@@ -40,7 +40,7 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
     }),
     execute: async ({
       query,
-      limit = 8,
+      limit = 18,
       minSimilarity = 0.25,
       dynamicThreshold = true,
     }) => {
@@ -56,7 +56,7 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
         console.log(`[searchKnowledge] Starting search for query: "${query}"`);
         
         // Validate parameters
-        const validatedLimit = Math.min(Math.max(limit, 1), 15);
+        const validatedLimit = Math.min(Math.max(limit, 1), 25);
         let validatedSimilarity = Math.min(Math.max(minSimilarity, 0.0), 1.0);
 
         // Adjust threshold dynamically based on query characteristics
@@ -92,6 +92,12 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
           }
         }
 
+        // Temporary: Force very low threshold for debugging
+        if (process.env.NODE_ENV === 'production') {
+          validatedSimilarity = Math.min(validatedSimilarity, 0.1);
+          console.log(`[searchKnowledge] PRODUCTION: Forced threshold to ${validatedSimilarity} for debugging`);
+        }
+        
         console.log(`[searchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`);
 
         // Search the user's knowledge base using LangChain
@@ -150,7 +156,7 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
             keywordBoost: result.keywordBoost ? Math.round(result.keywordBoost * 100) / 100 : undefined,
             contentLength: result.content.length,
             // Add preview of content for better context
-            preview: result.content.length > 200 ? result.content.substring(0, 200) + '...' : result.content,
+            preview: result.content.length > 200 ? `${result.content.substring(0, 200)}...` : result.content,
           }),
         );
 

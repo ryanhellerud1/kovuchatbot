@@ -1,16 +1,14 @@
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { Document } from '@langchain/core/documents';
-import { VectorStore } from '@langchain/core/vectorstores';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
-import { TextLoader } from 'langchain/document_loaders/fs/text';
-import { cosineSimilarity } from './similarity';
+import { createPostgreSQLVectorStore } from './langchain-vector-store';
 import { getUserDocumentChunks, saveKnowledgeDocument, saveDocumentChunk } from '@/lib/db/queries';
 import { processDocumentWithLangChain } from './langchain-document-processor';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 /**
  * LangChain-based RAG implementation that replaces the custom RAG system
@@ -25,83 +23,13 @@ export interface LangChainRAGConfig {
 }
 
 const DEFAULT_CONFIG: LangChainRAGConfig = {
-  chunkSize: 1500,      // Increased chunk size for better context
-  chunkOverlap: 300,    // Increased overlap to maintain context between chunks
+  chunkSize: 1800,      // Larger chunks for more context per chunk
+  chunkOverlap: 400,    // Significant overlap to maintain context continuity
   embeddingModel: 'text-embedding-3-small',
-  similarityThreshold: 0.25, // Much lower default threshold for comprehensive results
+  similarityThreshold: 0.2, // Even lower threshold for more comprehensive results
 };
 
-/**
- * Simple PostgreSQL Vector Store that doesn't extend LangChain VectorStore
- * to avoid compatibility issues
- */
-class SimplePostgreSQLVectorStore {
-  private userId: string;
-  private embeddings: OpenAIEmbeddings;
-
-  constructor(embeddings: OpenAIEmbeddings, userId: string) {
-    this.embeddings = embeddings;
-    this.userId = userId;
-  }
-
-  async addDocuments(documents: Document[], options?: { documentId?: string; documentTitle?: string }): Promise<string[]> {
-    const texts = documents.map(doc => doc.pageContent);
-    const embeddings = await this.embeddings.embedDocuments(texts);
-
-    const chunks = documents.map((doc, index) => ({
-      documentId: options?.documentId || 'unknown',
-      chunkIndex: index,
-      content: doc.pageContent,
-      embedding: embeddings[index],
-      chunkMetadata: doc.metadata || {},
-    }));
-
-    await saveDocumentChunks(chunks);
-    return chunks.map((_, index) => `${options?.documentId}_${index}`);
-  }
-
-  async addVectors(vectors: number[][], documents: Document[]): Promise<string[]> {
-    // Not implemented for this use case
-    throw new Error('addVectors not implemented');
-  }
-
-  async similaritySearchWithScore(query: string, k: number = 4): Promise<[Document, number][]> {
-    const queryEmbedding = await this.embeddings.embedQuery(query);
-    const chunks = await getUserDocumentChunks(this.userId);
-
-    const results: Array<{ document: Document; score: number }> = [];
-
-    for (const chunk of chunks) {
-      if (!chunk.embedding || !Array.isArray(chunk.embedding)) continue;
-
-      const similarity = cosineSimilarity(queryEmbedding, chunk.embedding as number[]);
-      
-      const document = new Document({
-        pageContent: chunk.content,
-        metadata: {
-          documentId: chunk.documentId,
-          documentTitle: chunk.documentTitle,
-          chunkIndex: chunk.chunkIndex,
-          similarity,
-        },
-      });
-
-      results.push({ document, score: similarity });
-    }
-
-    results.sort((a, b) => b.score - a.score);
-    return results.slice(0, k).map(result => [result.document, result.score]);
-  }
-
-  async similaritySearch(query: string, k: number = 4): Promise<Document[]> {
-    const results = await this.similaritySearchWithScore(query, k);
-    return results.map(([document]) => document);
-  }
-
-  async delete(): Promise<void> {
-    // Not implemented
-  }
-}
+// Remove the custom vector store - we'll use the proper LangChain one from langchain-vector-store.ts
 
 /**
  * Supported file types for LangChain document processing
@@ -447,7 +375,7 @@ export async function searchKnowledgeBase(
   userId: string,
   options: SearchOptions = {}
 ): Promise<SearchResult[]> {
-  const { limit = 15, minSimilarity = 0.25, includeMetadata = true } = options;
+  const { limit = 20, minSimilarity = 0.25, includeMetadata = true } = options;
 
   try {
     console.log(`[LangChain] Starting search for user ${userId} with query: "${query}"`);
@@ -466,10 +394,10 @@ export async function searchKnowledgeBase(
       modelName: 'text-embedding-3-small',
     });
 
-    const vectorStore = new SimplePostgreSQLVectorStore(embeddings, userId);
+    const vectorStore = await createPostgreSQLVectorStore(userId, embeddings);
     
-    // Search with the main query - fetch more results to have better selection
-    const mainResults = await vectorStore.similaritySearchWithScore(processedQuery, limit * 3);
+    // Search with the main query - fetch significantly more results for better selection and context
+    const mainResults = await vectorStore.similaritySearchWithScore(processedQuery, limit * 4);
     console.log(`[LangChain] Retrieved ${mainResults.length} results for main query`);
     
     // If we have variations and not enough good results, search with variations too
@@ -479,7 +407,7 @@ export async function searchKnowledgeBase(
     if (queryVariations.length > 1 && goodMainResults.length < limit) {
       // Only search with variations if we need more results
       for (let i = 1; i < queryVariations.length && goodMainResults.length < limit; i++) {
-        const variationResults = await vectorStore.similaritySearchWithScore(queryVariations[i], limit * 2);
+        const variationResults = await vectorStore.similaritySearchWithScore(queryVariations[i], limit * 3);
         console.log(`[LangChain] Retrieved ${variationResults.length} results for variation "${queryVariations[i]}"`);
         allResults = [...allResults, ...variationResults];
       }
@@ -526,8 +454,11 @@ export async function searchKnowledgeBase(
     // Implement keyword boosting for exact matches
     const boostedResults = boostExactMatches(query, filteredResults);
     
+    // Add document diversity to ensure results from multiple documents when possible
+    const diversifiedResults = diversifyResultsByDocument(boostedResults, limit);
+    
     // For highly relevant results, try to include adjacent chunks for more context
-    const enhancedResults = await enhanceWithAdjacentChunks(boostedResults, userId);
+    const enhancedResults = await enhanceWithAdjacentChunks(diversifiedResults, userId);
 
     return enhancedResults;
   } catch (error) {
@@ -585,6 +516,57 @@ function boostExactMatches(query: string, results: SearchResult[]): SearchResult
 }
 
 /**
+ * Diversify results to include content from multiple documents when possible
+ */
+function diversifyResultsByDocument(results: SearchResult[], targetLimit: number): SearchResult[] {
+  if (results.length <= targetLimit) return results;
+  
+  // Group results by document
+  const resultsByDocument = new Map<string, SearchResult[]>();
+  
+  for (const result of results) {
+    const docId = result.source.documentId;
+    if (!resultsByDocument.has(docId)) {
+      resultsByDocument.set(docId, []);
+    }
+    resultsByDocument.get(docId)!.push(result);
+  }
+  
+  // If we only have one document, return top results
+  if (resultsByDocument.size === 1) {
+    return results.slice(0, targetLimit);
+  }
+  
+  console.log(`[diversifyResultsByDocument] Found results from ${resultsByDocument.size} documents`);
+  
+  // Distribute results across documents
+  const diversifiedResults: SearchResult[] = [];
+  const maxPerDocument = Math.max(2, Math.floor(targetLimit / resultsByDocument.size));
+  
+  // First pass: take top results from each document
+  for (const [docId, docResults] of resultsByDocument) {
+    const topFromDoc = docResults.slice(0, maxPerDocument);
+    diversifiedResults.push(...topFromDoc);
+  }
+  
+  // Second pass: fill remaining slots with highest similarity results
+  const remainingSlots = targetLimit - diversifiedResults.length;
+  if (remainingSlots > 0) {
+    const usedIds = new Set(diversifiedResults.map(r => r.id));
+    const remainingResults = results
+      .filter(r => !usedIds.has(r.id))
+      .slice(0, remainingSlots);
+    
+    diversifiedResults.push(...remainingResults);
+  }
+  
+  // Sort by similarity and return
+  return diversifiedResults
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, targetLimit);
+}
+
+/**
  * Extract important keywords from a query
  */
 function extractKeywords(query: string): string[] {
@@ -615,28 +597,35 @@ function extractKeywords(query: string): string[] {
 async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string): Promise<SearchResult[]> {
   if (!results.length) return results;
   
-  // Only enhance results with high similarity scores
+  // Lower threshold to include more context - even moderately relevant results benefit from context
+  const contextThreshold = 0.4;
   const highRelevanceThreshold = 0.6;
   const enhancedResults: SearchResult[] = [];
   
   for (const result of results) {
     enhancedResults.push(result);
     
-    // For highly relevant results, try to get adjacent chunks
-    if (result.similarity >= highRelevanceThreshold) {
+    // For relevant results, try to get adjacent chunks
+    if (result.similarity >= contextThreshold) {
       try {
+        // Get more adjacent chunks for better context (2 before, 2 after)
         const adjacentChunks = await getAdjacentChunks(
           result.source.documentId, 
           result.source.chunkIndex, 
-          userId
+          userId,
+          2 // Get 2 chunks in each direction
         );
         
-        // Add adjacent chunks as separate results with lower similarity
+        // Add adjacent chunks as separate results with contextual similarity
         for (const chunk of adjacentChunks) {
+          // Calculate contextual similarity based on distance from original chunk
+          const distance = Math.abs(chunk.chunkIndex - result.source.chunkIndex);
+          const contextualSimilarity = Math.max(0.15, result.similarity - (0.1 * distance));
+          
           const adjacentResult: SearchResult = {
             id: `${result.id}_adjacent_${chunk.chunkIndex}`,
             content: chunk.content,
-            similarity: Math.max(0.1, result.similarity - 0.2), // Lower similarity for context
+            similarity: contextualSimilarity,
             source: {
               documentId: result.source.documentId,
               documentTitle: result.source.documentTitle,
@@ -646,6 +635,7 @@ async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string
               ...result.metadata,
               isAdjacentContext: true,
               originalChunkIndex: result.source.chunkIndex,
+              contextDistance: distance,
             },
           };
           enhancedResults.push(adjacentResult);
@@ -656,10 +646,10 @@ async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string
     }
   }
   
-  // Sort by similarity again and limit to reasonable number
+  // Sort by similarity again and allow more results with context
   return enhancedResults
     .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 20); // Allow more results with context
+    .slice(0, 30); // Allow significantly more results with context
 }
 
 /**
@@ -668,7 +658,8 @@ async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string
 async function getAdjacentChunks(
   documentId: string, 
   chunkIndex: number, 
-  userId: string
+  userId: string,
+  range: number = 1
 ): Promise<Array<{ content: string; chunkIndex: number }>> {
   try {
     const allChunks = await getUserDocumentChunks(userId);
@@ -680,22 +671,26 @@ async function getAdjacentChunks(
     
     const adjacentChunks: Array<{ content: string; chunkIndex: number }> = [];
     
-    // Get previous chunk
-    const prevChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex - 1);
-    if (prevChunk) {
-      adjacentChunks.push({
-        content: prevChunk.content,
-        chunkIndex: prevChunk.chunkIndex,
-      });
+    // Get chunks before the current chunk
+    for (let i = 1; i <= range; i++) {
+      const prevChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex - i);
+      if (prevChunk) {
+        adjacentChunks.push({
+          content: prevChunk.content,
+          chunkIndex: prevChunk.chunkIndex,
+        });
+      }
     }
     
-    // Get next chunk
-    const nextChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex + 1);
-    if (nextChunk) {
-      adjacentChunks.push({
-        content: nextChunk.content,
-        chunkIndex: nextChunk.chunkIndex,
-      });
+    // Get chunks after the current chunk
+    for (let i = 1; i <= range; i++) {
+      const nextChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex + i);
+      if (nextChunk) {
+        adjacentChunks.push({
+          content: nextChunk.content,
+          chunkIndex: nextChunk.chunkIndex,
+        });
+      }
     }
     
     return adjacentChunks;
@@ -856,7 +851,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 /**
  * Simple text chunking function for testing purposes
  */
-export function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200): string[] {
+export function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
   const chunks: string[] = [];
   let start = 0;
   

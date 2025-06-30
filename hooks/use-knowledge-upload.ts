@@ -52,10 +52,10 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
         throw new Error('Unsupported file type. Please upload PDF, DOCX, TXT, or Markdown files.');
       }
 
-      // Validate file size (10MB limit)
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      // Validate file size (4.5MB limit)
+      const maxSize = 4.5 * 1024 * 1024; // 4.5MB
       if (file.size > maxSize) {
-        throw new Error('File size must be less than 10MB.');
+        throw new Error('File size must be less than 4.5MB.');
       }
 
       setUploadProgress(10);

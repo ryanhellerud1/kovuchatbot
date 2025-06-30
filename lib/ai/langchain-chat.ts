@@ -1,8 +1,8 @@
-import { ChatOpenAI } from '@langchain/openai';
+import type { ChatOpenAI } from '@langchain/openai';
 import { AgentExecutor, createOpenAIFunctionsAgent } from 'langchain/agents';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
-import { BaseMessage } from '@langchain/core/messages';
-import { StructuredTool } from '@langchain/core/tools';
+import type { BaseMessage } from '@langchain/core/messages';
+import type { StructuredTool } from '@langchain/core/tools';
 import { 
   getLangChainModel, 
   isLangChainModel,
@@ -10,8 +10,7 @@ import {
 } from './langchain-providers';
 import { 
   convertToLangChainMessage, 
-  convertFromLangChainMessage,
-  LangChainToolContext 
+  type LangChainToolContext 
 } from './langchain-types';
 import { 
   withLangChainErrorHandling, 

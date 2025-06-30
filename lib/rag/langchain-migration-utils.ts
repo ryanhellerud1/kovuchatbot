@@ -1,14 +1,14 @@
 import { Document } from '@langchain/core/documents';
-import { LangChainDocument } from '@/lib/ai/langchain-types';
+import type { LangChainDocument } from '@/lib/ai/langchain-types';
 import { withLangChainErrorHandling, shouldUseLangChain } from '@/lib/ai/langchain-utils';
 import { 
   processDocument as legacyProcessDocument,
-  ProcessedDocument as LegacyProcessedDocument 
+  type ProcessedDocument as LegacyProcessedDocument 
 } from './retriever';
 import { 
   processDocumentWithLangChain,
-  LangChainProcessedDocument,
-  LangChainSupportedFileType 
+  type LangChainProcessedDocument,
+  type LangChainSupportedFileType 
 } from './langchain-document-processor';
 import { searchKnowledgeBase as legacySearchKnowledgeBase } from './retriever';
 import { queryLangChainRAG } from './langchain-retrieval-chain';

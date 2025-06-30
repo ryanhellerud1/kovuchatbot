@@ -1,16 +1,25 @@
 import type { InferSelectModel } from 'drizzle-orm';
-import {
-  pgTable,
-  varchar,
-  timestamp,
-  json,
-  uuid,
-  text,
-  primaryKey,
-  foreignKey,
-  boolean,
-  integer,
-} from 'drizzle-orm/pg-core';
+import { pgTable, varchar, timestamp, json, uuid, text, primaryKey, foreignKey, boolean, integer, customType } from 'drizzle-orm/pg-core';
+
+const vector = customType<{ data: number[] }>({
+  dataType() {
+    return 'vector(1536)';
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(',')}]`;
+  },
+  fromDriver(value: string): number[] {
+    if (typeof value === 'string') {
+      // Handle both JSON array format and PostgreSQL vector format
+      if (value.startsWith('[') && value.endsWith(']')) {
+        return JSON.parse(value);
+      }
+      // Handle PostgreSQL vector format like "[1,2,3]"
+      return value.slice(1, -1).split(',').map(Number);
+    }
+    return value as number[];
+  },
+});
 
 export const user = pgTable('User', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
@@ -178,9 +187,11 @@ export const documentChunks = pgTable('document_chunks', {
     .references(() => knowledgeDocuments.id),
   chunkIndex: integer('chunk_index').notNull(),
   content: text('content').notNull(),
-  embedding: json('embedding'), // Store embedding vector as JSON array
+  embedding: vector('embedding'),
   chunkMetadata: json('chunk_metadata'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
-export type DocumentChunk = InferSelectModel<typeof documentChunks>;
+export type DocumentChunk = InferSelectModel<typeof documentChunks> & {
+  similarity?: number;
+};

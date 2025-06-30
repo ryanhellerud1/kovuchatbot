@@ -1,14 +1,14 @@
-import { Document } from '@langchain/core/documents';
+import type { Document } from '@langchain/core/documents';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { createLangChainEmbeddings } from '@/lib/ai/langchain-providers';
 import { withLangChainErrorHandling, withLangChainTiming } from '@/lib/ai/langchain-utils';
-import { LangChainDocument } from '@/lib/ai/langchain-types';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import type { LangChainDocument } from '@/lib/ai/langchain-types';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 /**
  * Supported file types for LangChain document processing
