@@ -25,8 +25,8 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
       limit: z
         .number()
         .optional()
-        .default(12)
-        .describe('Maximum number of results to return (1-15)'),
+        .default(18)
+        .describe('Maximum number of results to return (1-25)'),
       minSimilarity: z
         .number()
         .optional()
@@ -40,7 +40,7 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
     }),
     execute: async ({
       query,
-      limit = 12,
+      limit = 18,
       minSimilarity = 0.25,
       dynamicThreshold = true,
     }) => {
@@ -56,7 +56,7 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
         console.log(`[searchKnowledge] Starting search for query: "${query}"`);
         
         // Validate parameters
-        const validatedLimit = Math.min(Math.max(limit, 1), 15);
+        const validatedLimit = Math.min(Math.max(limit, 1), 25);
         let validatedSimilarity = Math.min(Math.max(minSimilarity, 0.0), 1.0);
 
         // Adjust threshold dynamically based on query characteristics

@@ -616,13 +616,15 @@ export async function similaritySearch({
   queryEmbedding,
   userId,
   k,
+  minSimilarity = 0.1,
 }: {
   queryEmbedding: number[];
   userId: string;
   k: number;
+  minSimilarity?: number;
 }) {
   try {
-    // Use pgvector extension for similarity search
+    // Use pgvector extension for similarity search with minimum threshold
     const vectorQuery = sql`
       SELECT
         dc.id,
@@ -637,11 +639,13 @@ export async function similaritySearch({
       INNER JOIN knowledge_documents kd ON dc.document_id = kd.id
       WHERE kd.user_id = ${userId}
         AND dc.embedding IS NOT NULL
+        AND (1 - (dc.embedding <=> ${`[${queryEmbedding.join(',')}]`})) >= ${minSimilarity}
       ORDER BY similarity DESC
-      LIMIT ${k}
+      LIMIT ${Math.min(k, 100)}
     `;
 
     const results = await db.execute(vectorQuery);
+    console.log(`[similaritySearch] Found ${results.length} results above similarity threshold ${minSimilarity}`);
     return results as unknown as DocumentChunk[];
   } catch (error) {
     console.error('Vector similarity search failed:', error);
