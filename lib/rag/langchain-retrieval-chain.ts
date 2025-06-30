@@ -1,12 +1,11 @@
-import { ChatOpenAI } from '@langchain/openai';
+import type { ChatOpenAI } from '@langchain/openai';
 import { RetrievalQAChain } from 'langchain/chains';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { Document } from '@langchain/core/documents';
-import { BaseRetriever } from '@langchain/core/retrievers';
+import type { Document } from '@langchain/core/documents';
 import { PostgreSQLRetriever, createPostgreSQLRetriever } from './langchain-vector-store';
 import { getLangChainModel } from '@/lib/ai/langchain-providers';
 import { withLangChainErrorHandling, withLangChainTiming } from '@/lib/ai/langchain-utils';
-import { LangChainSearchResult } from '@/lib/ai/langchain-types';
+import type { LangChainSearchResult } from '@/lib/ai/langchain-types';
 
 /**
  * LangChain RAG chain configuration

@@ -3,9 +3,9 @@
  * This provides better Next.js compatibility than pdf-parse
  */
 
-import { writeFileSync, unlinkSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { writeFileSync, unlinkSync, } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 /**
  * Fix character spacing issues common in PDF extraction
@@ -138,7 +138,7 @@ export async function parsePDFWithJson(
       pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
         try {
           // Extract text from the parsed data
-          if (pdfData && pdfData.Pages && Array.isArray(pdfData.Pages)) {
+          if (pdfData?.Pages && Array.isArray(pdfData.Pages)) {
             const textParts: string[] = [];
 
             for (const page of pdfData.Pages) {
@@ -158,7 +158,7 @@ export async function parsePDFWithJson(
             }
 
             // Join text parts and clean up excessive spacing
-            let rawText = textParts.join(' ').trim();
+            const rawText = textParts.join(' ').trim();
             
             // Fix common PDF parsing issues where characters are separated by spaces
             extractedText = fixCharacterSpacing(rawText);
@@ -248,7 +248,7 @@ export async function parsePDFWithFile(
           }
 
           // Extract text from the parsed data
-          if (pdfData && pdfData.Pages && Array.isArray(pdfData.Pages)) {
+          if (pdfData?.Pages && Array.isArray(pdfData.Pages)) {
             const textParts: string[] = [];
 
             for (const page of pdfData.Pages) {
@@ -357,9 +357,7 @@ export async function parsePDFBuffer(
 
       // Both methods failed, provide helpful error message
       throw new Error(
-        `PDF parsing failed with both methods. Error details: ${bufferError.message}. ` +
-          'This PDF may be corrupted, password-protected, or contain only images. ' +
-          'Please try a different PDF or convert to text format.',
+        `PDF parsing failed with both methods. Error details: ${bufferError.message}. This PDF may be corrupted, password-protected, or contain only images. Please try a different PDF or convert to text format.`,
       );
     }
   }

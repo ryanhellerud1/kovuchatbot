@@ -1,11 +1,9 @@
 import { VectorStore } from '@langchain/core/vectorstores';
 import { Document } from '@langchain/core/documents';
-import { Embeddings } from '@langchain/core/embeddings';
+import type { Embeddings } from '@langchain/core/embeddings';
 import { createLangChainEmbeddings } from '@/lib/ai/langchain-providers';
-import { LangChainDocument, LangChainSearchResult } from '@/lib/ai/langchain-types';
 import { withLangChainErrorHandling, withLangChainTiming } from '@/lib/ai/langchain-utils';
-import { getUserDocumentChunks, saveKnowledgeDocument, saveDocumentChunk } from '@/lib/db/queries';
-import { cosineSimilarity } from './similarity';
+import { saveKnowledgeDocument, saveDocumentChunk, similaritySearch } from '@/lib/db/queries';
 
 /**
  * Helper function to save multiple document chunks
@@ -142,7 +140,7 @@ export class PostgreSQLVectorStore extends VectorStore {
    */
   async similaritySearchWithScore(
     query: string,
-    k: number = 4,
+    k = 4,
     filter?: Record<string, any>
   ): Promise<[Document, number][]> {
     return withLangChainErrorHandling('similaritySearchWithScore', async () => {
@@ -153,29 +151,19 @@ export class PostgreSQLVectorStore extends VectorStore {
         const queryEmbedding = await this.embeddings.embedQuery(query);
 
         // Get all user's document chunks
-        const chunks = await getUserDocumentChunks(this.userId);
+        const chunks = await similaritySearch({
+          queryEmbedding,
+          userId: this.userId,
+          k,
+        });
         console.log(`[LangChain VectorStore] Retrieved ${chunks.length} chunks from database`);
 
         if (chunks.length === 0) {
           return [];
         }
 
-        // Calculate similarities and create results
-        const results: Array<{ document: Document; score: number }> = [];
-
-        for (const chunk of chunks) {
-          if (!chunk.embedding || !Array.isArray(chunk.embedding)) {
-            continue;
-          }
-
-          // Apply filters if provided
-          if (filter && !this.matchesFilter(chunk, filter)) {
-            continue;
-          }
-
-          const similarity = cosineSimilarity(queryEmbedding, chunk.embedding as number[]);
-
-          // Convert chunk to LangChain Document
+        // Convert chunks to LangChain Documents
+        const results = chunks.map((chunk) => {
           const document = new Document({
             pageContent: chunk.content,
             metadata: {
@@ -188,21 +176,17 @@ export class PostgreSQLVectorStore extends VectorStore {
             },
           });
 
-          results.push({ document, score: similarity });
-        }
+          return [document, chunk.similarity] as [Document, number];
+        });
 
-        // Sort by similarity (highest first) and limit results
-        results.sort((a, b) => b.score - a.score);
-        const topResults = results.slice(0, k);
-
-        console.log(`[LangChain VectorStore] Found ${topResults.length} results`);
+        console.log(`[LangChain VectorStore] Found ${results.length} results`);
         
-        if (topResults.length > 0) {
-          const scores = topResults.map(r => r.score);
+        if (results.length > 0) {
+          const scores = results.map(r => r[1]);
           console.log(`[LangChain VectorStore] Score range: ${Math.min(...scores).toFixed(3)} - ${Math.max(...scores).toFixed(3)}`);
         }
 
-        return topResults.map(result => [result.document, result.score]);
+        return results;
       });
     });
   }
@@ -212,7 +196,7 @@ export class PostgreSQLVectorStore extends VectorStore {
    */
   async similaritySearch(
     query: string,
-    k: number = 4,
+    k = 4,
     filter?: Record<string, any>
   ): Promise<Document[]> {
     const results = await this.similaritySearchWithScore(query, k, filter);
@@ -238,22 +222,6 @@ export class PostgreSQLVectorStore extends VectorStore {
         return;
       }
     });
-  }
-
-  /**
-   * Check if chunk matches filter criteria
-   */
-  private matchesFilter(chunk: any, filter: Record<string, any>): boolean {
-    for (const [key, value] of Object.entries(filter)) {
-      if (key === 'documentId' && chunk.documentId !== value) {
-        return false;
-      }
-      if (key === 'documentTitle' && chunk.documentTitle !== value) {
-        return false;
-      }
-      // Add more filter criteria as needed
-    }
-    return true;
   }
 
   /**

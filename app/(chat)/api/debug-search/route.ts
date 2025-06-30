@@ -1,8 +1,24 @@
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
 import { getUserDocumentChunks } from '@/lib/db/queries';
 import { generateEmbedding } from '@/lib/rag/retriever';
-import { cosineSimilarity } from '@/lib/rag/similarity';
+// Simple cosine similarity for debugging (pgvector handles the real similarity search)
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  
+  const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+  return magnitude === 0 ? 0 : dotProduct / magnitude;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,6 +71,7 @@ export async function POST(request: NextRequest) {
       }
       
       validChunks++;
+      // Use LangChain's cosineSimilarity function
       const similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
       
       results.push({
@@ -63,7 +80,7 @@ export async function POST(request: NextRequest) {
         documentTitle: chunk.documentTitle,
         chunkIndex: chunk.chunkIndex,
         similarity: Math.round(similarity * 1000) / 1000, // Round to 3 decimal places
-        contentPreview: chunk.content.substring(0, 200) + '...',
+        contentPreview: `${chunk.content.substring(0, 200)}...`,
         embeddingLength: chunkEmbedding.length,
       });
     }

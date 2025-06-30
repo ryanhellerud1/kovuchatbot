@@ -1,20 +1,7 @@
-import 'server-only';
+import { sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, inArray, lt, type SQL } from 'drizzle-orm';
 
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  gt,
-  gte,
-  inArray,
-  lt,
-  type SQL,
-} from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-
+import { db } from './client';
 import {
   user,
   chat,
@@ -39,9 +26,7 @@ import { generateHashedPassword } from './utils';
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 
-// biome-ignore lint: Forbidden non-null assertion.
-const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
+
 
 export async function getUser(email: string): Promise<Array<User>> {
   try {
@@ -487,7 +472,7 @@ export async function saveKnowledgeDocument({
   fileSize,
   metadata,
 }: {
-  id: string;
+  id?: string;
   userId: string;
   title: string;
   content?: string;
@@ -538,7 +523,7 @@ export async function saveDocumentChunk({
         documentId,
         chunkIndex,
         content,
-        embedding: embedding, // Drizzle handles JSON serialization automatically
+        embedding: embedding,
         chunkMetadata: metadata,
       })
       .returning();
@@ -552,8 +537,8 @@ export async function saveDocumentChunk({
 
 export async function getUserKnowledgeDocuments(
   userId: string,
-  limit: number = 50,
-  offset: number = 0,
+  limit = 50,
+  offset = 0,
 ): Promise<KnowledgeDocument[]> {
   try {
     return await db
@@ -624,6 +609,43 @@ export async function getDocumentChunks(documentId: string) {
   } catch (error) {
     console.error('Failed to get document chunks from database');
     throw error;
+  }
+}
+
+export async function similaritySearch({
+  queryEmbedding,
+  userId,
+  k,
+}: {
+  queryEmbedding: number[];
+  userId: string;
+  k: number;
+}) {
+  try {
+    // Use pgvector extension for similarity search
+    const vectorQuery = sql`
+      SELECT
+        dc.id,
+        dc.document_id as "documentId",
+        dc.content,
+        dc.chunk_index as "chunkIndex",
+        dc.chunk_metadata as "chunkMetadata",
+        kd.title as "documentTitle",
+        dc.created_at as "createdAt",
+        1 - (dc.embedding <=> ${`[${queryEmbedding.join(',')}]`}) as similarity
+      FROM document_chunks dc
+      INNER JOIN knowledge_documents kd ON dc.document_id = kd.id
+      WHERE kd.user_id = ${userId}
+        AND dc.embedding IS NOT NULL
+      ORDER BY similarity DESC
+      LIMIT ${k}
+    `;
+
+    const results = await db.execute(vectorQuery);
+    return results as unknown as DocumentChunk[];
+  } catch (error) {
+    console.error('Vector similarity search failed:', error);
+    throw new Error('Vector similarity search is not available. Please ensure pgvector extension is installed.');
   }
 }
 

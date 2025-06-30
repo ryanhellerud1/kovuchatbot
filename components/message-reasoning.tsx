@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useMediaQuery } from 'usehooks-ts';
 import { LoaderIcon, ChevronDownIcon, ArrowUpIcon } from './icons';
 import { MathEquation } from './MathEquation';
 import { Button } from './ui/button';
-import { cn } from '@/lib/utils';
 
 interface MessageReasoningProps {
   isLoading: boolean;
@@ -76,7 +75,7 @@ export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps
           const chunkSize = Math.min(3, newWords.length - currentIndex); // Reduced from 5 to 3
           const textChunk = newWords.slice(currentIndex, currentIndex + chunkSize).join(' ');
           if (textChunk) {
-            newContentParts.push(textChunk + ' ');
+            newContentParts.push(`${textChunk} `);
           }
           currentIndex += chunkSize;
 

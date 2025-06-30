@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 
 import { auth } from '@/app/(auth)/auth';
 import { 
@@ -24,8 +23,8 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Number.parseInt(searchParams.get('limit') || '50');
+    const offset = Number.parseInt(searchParams.get('offset') || '0');
 
     const documents = await getUserKnowledgeDocuments(session.user.id, limit, offset);
 

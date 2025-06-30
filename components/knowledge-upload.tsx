@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useKnowledgeUpload, type KnowledgeDocument } from '@/hooks/use-knowledge-upload';
 import { Button } from './ui/button';

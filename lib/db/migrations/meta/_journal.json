@@ -50,6 +50,13 @@
       "when": 1750894605453,
       "tag": "0006_brown_the_watchers",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1751253452555,
+      "tag": "0007_smiling_preak",
+      "breakpoints": true
     }
   ]
 }

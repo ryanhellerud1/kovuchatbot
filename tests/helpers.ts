@@ -70,6 +70,27 @@ export async function createAuthenticatedContext({
   };
 }
 
+import { generateHashedPassword } from '@/lib/db/utils';
+import { user } from '@/lib/db/schema';
+import { db, } from '@/lib/db/client';
+import { eq } from 'drizzle-orm';
+
+export async function createUser() {
+  const email = `test-${getUnixTime(new Date())}@playwright.com`;
+  const password = generateHashedPassword(generateId(16));
+
+  const [newUser] = await db
+    .insert(user)
+    .values({ email, password })
+    .returning();
+
+  return newUser;
+}
+
+export async function deleteUser(id: string) {
+  await db.delete(user).where(eq(user.id, id));
+}
+
 export function generateRandomTestUser() {
   const email = `test-${getUnixTime(new Date())}@playwright.com`;
   const password = generateId(16);

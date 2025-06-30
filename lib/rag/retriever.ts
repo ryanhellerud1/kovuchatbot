@@ -1,16 +1,14 @@
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { Document } from '@langchain/core/documents';
-import { VectorStore } from '@langchain/core/vectorstores';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
-import { TextLoader } from 'langchain/document_loaders/fs/text';
-import { cosineSimilarity } from './similarity';
+import { createPostgreSQLVectorStore } from './langchain-vector-store';
 import { getUserDocumentChunks, saveKnowledgeDocument, saveDocumentChunk } from '@/lib/db/queries';
 import { processDocumentWithLangChain } from './langchain-document-processor';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 /**
  * LangChain-based RAG implementation that replaces the custom RAG system
@@ -31,77 +29,7 @@ const DEFAULT_CONFIG: LangChainRAGConfig = {
   similarityThreshold: 0.25, // Much lower default threshold for comprehensive results
 };
 
-/**
- * Simple PostgreSQL Vector Store that doesn't extend LangChain VectorStore
- * to avoid compatibility issues
- */
-class SimplePostgreSQLVectorStore {
-  private userId: string;
-  private embeddings: OpenAIEmbeddings;
-
-  constructor(embeddings: OpenAIEmbeddings, userId: string) {
-    this.embeddings = embeddings;
-    this.userId = userId;
-  }
-
-  async addDocuments(documents: Document[], options?: { documentId?: string; documentTitle?: string }): Promise<string[]> {
-    const texts = documents.map(doc => doc.pageContent);
-    const embeddings = await this.embeddings.embedDocuments(texts);
-
-    const chunks = documents.map((doc, index) => ({
-      documentId: options?.documentId || 'unknown',
-      chunkIndex: index,
-      content: doc.pageContent,
-      embedding: embeddings[index],
-      chunkMetadata: doc.metadata || {},
-    }));
-
-    await saveDocumentChunks(chunks);
-    return chunks.map((_, index) => `${options?.documentId}_${index}`);
-  }
-
-  async addVectors(vectors: number[][], documents: Document[]): Promise<string[]> {
-    // Not implemented for this use case
-    throw new Error('addVectors not implemented');
-  }
-
-  async similaritySearchWithScore(query: string, k: number = 4): Promise<[Document, number][]> {
-    const queryEmbedding = await this.embeddings.embedQuery(query);
-    const chunks = await getUserDocumentChunks(this.userId);
-
-    const results: Array<{ document: Document; score: number }> = [];
-
-    for (const chunk of chunks) {
-      if (!chunk.embedding || !Array.isArray(chunk.embedding)) continue;
-
-      const similarity = cosineSimilarity(queryEmbedding, chunk.embedding as number[]);
-      
-      const document = new Document({
-        pageContent: chunk.content,
-        metadata: {
-          documentId: chunk.documentId,
-          documentTitle: chunk.documentTitle,
-          chunkIndex: chunk.chunkIndex,
-          similarity,
-        },
-      });
-
-      results.push({ document, score: similarity });
-    }
-
-    results.sort((a, b) => b.score - a.score);
-    return results.slice(0, k).map(result => [result.document, result.score]);
-  }
-
-  async similaritySearch(query: string, k: number = 4): Promise<Document[]> {
-    const results = await this.similaritySearchWithScore(query, k);
-    return results.map(([document]) => document);
-  }
-
-  async delete(): Promise<void> {
-    // Not implemented
-  }
-}
+// Remove the custom vector store - we'll use the proper LangChain one from langchain-vector-store.ts
 
 /**
  * Supported file types for LangChain document processing
@@ -466,7 +394,7 @@ export async function searchKnowledgeBase(
       modelName: 'text-embedding-3-small',
     });
 
-    const vectorStore = new SimplePostgreSQLVectorStore(embeddings, userId);
+    const vectorStore = await createPostgreSQLVectorStore(userId, embeddings);
     
     // Search with the main query - fetch more results to have better selection
     const mainResults = await vectorStore.similaritySearchWithScore(processedQuery, limit * 3);
@@ -856,7 +784,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 /**
  * Simple text chunking function for testing purposes
  */
-export function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200): string[] {
+export function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
   const chunks: string[] = [];
   let start = 0;
   
