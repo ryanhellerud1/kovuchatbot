@@ -9,12 +9,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Configure body size limits for API routes
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-  },
   images: {
     remotePatterns: [
       {

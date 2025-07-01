@@ -17,7 +17,7 @@ export interface BlobUploadResult {
 
 /**
  * Upload a file using a dedicated blob upload endpoint
- * This bypasses the serverless function size limits
+ * This bypasses the serverless function size limits for most files
  */
 export async function uploadFileToBlob(
   file: File,
@@ -79,8 +79,9 @@ export async function uploadFileToBlob(
  * Check if a file should use direct blob upload based on size
  */
 export function shouldUseDirectBlobUpload(fileSize: number): boolean {
-  // Use direct blob upload for files larger than 4MB to avoid serverless limits
-  const threshold = 4 * 1024 * 1024; // 4MB
+  // Use direct blob upload for files larger than 2MB to avoid serverless limits
+  // Vercel has a ~4.5MB limit, but we use 2MB to be very safe and account for form data overhead
+  const threshold = 2 * 1024 * 1024; // 2MB
   return fileSize > threshold;
 }
 

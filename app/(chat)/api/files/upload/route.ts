@@ -47,6 +47,10 @@ const KnowledgeFileSchema = z.object({
 export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 seconds timeout for processing
 
+// Configure body size limit for large file uploads
+export const dynamic = 'force-dynamic';
+export const preferredRegion = 'auto';
+
 export async function POST(request: Request) {
   const session = await auth();
 

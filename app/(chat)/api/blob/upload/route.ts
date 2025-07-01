@@ -6,6 +6,10 @@ import { auth } from '@/app/(auth)/auth';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// Configure body size limit for large file uploads
+export const dynamic = 'force-dynamic';
+export const preferredRegion = 'auto';
+
 /**
  * Direct blob upload endpoint that handles file uploads to Vercel Blob
  * This bypasses the serverless function size limits for large files

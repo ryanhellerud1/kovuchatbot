@@ -67,34 +67,39 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
       if (useDirectBlob) {
         console.log(`Using direct blob upload for large file (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
         
-        // Upload directly to blob storage
-        const blobResult = await uploadFileToBlob(file, {
-          onProgress: (progress) => {
-            // Map blob upload progress to 5-70%
-            setUploadProgress(5 + (progress * 0.65));
+        try {
+          // Upload directly to blob storage
+          const blobResult = await uploadFileToBlob(file, {
+            onProgress: (progress) => {
+              // Map blob upload progress to 5-70%
+              setUploadProgress(5 + (progress * 0.65));
+            }
+          });
+          
+          setUploadProgress(70);
+          console.log('File uploaded to blob storage, now processing...');
+          
+          // Process the document from blob storage
+          const processResult = await processKnowledgeDocumentFromBlob(
+            blobResult.url,
+            blobResult.filename
+          );
+          
+          setUploadProgress(100);
+          
+          if (!processResult.success) {
+            throw new Error(processResult.error || 'Failed to process document');
           }
-        });
-        
-        setUploadProgress(70);
-        console.log('File uploaded to blob storage, now processing...');
-        
-        // Process the document from blob storage
-        const processResult = await processKnowledgeDocumentFromBlob(
-          blobResult.url,
-          blobResult.filename
-        );
-        
-        setUploadProgress(100);
-        
-        if (!processResult.success) {
-          throw new Error(processResult.error || 'Failed to process document');
-        }
-        
-        toast.success(`Document "${processResult.document.title}" uploaded successfully!`, {
-          description: `Processed ${processResult.document.chunkCount} chunks for AI search.`,
-        });
+          
+          toast.success(`Document "${processResult.document.title}" uploaded successfully!`, {
+            description: `Processed ${processResult.document.chunkCount} chunks for AI search.`,
+          });
 
-        return processResult.document;
+          return processResult.document;
+        } catch (blobError) {
+          console.error('Blob upload failed, this file is too large for the platform:', blobError);
+          throw new Error(`File too large for upload. The file size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds platform limits. Please try a smaller file or split the document into smaller parts.`);
+        }
       }
 
       // Use traditional upload for smaller files
