@@ -5,7 +5,8 @@ import { put, del, head } from '@vercel/blob';
  */
 
 // File size thresholds
-export const BLOB_STORAGE_THRESHOLD = 2 * 1024 * 1024; // 2MB - conservative threshold to avoid 413 errors
+export const BLOB_STORAGE_THRESHOLD = 4.5 * 1024 * 1024; // 4.5MB - original threshold
+export const SERVERLESS_LIMIT = 4.5 * 1024 * 1024; // 4.5MB - hard Vercel serverless limit
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 export const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 50MB for attachments
 export const MAX_KNOWLEDGE_DOCUMENT_SIZE = 15 * 1024 * 1024; // 15MB for knowledge documents

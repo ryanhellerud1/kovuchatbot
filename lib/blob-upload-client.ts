@@ -1,7 +1,9 @@
 /**
  * Client-side blob upload utilities for handling large files
- * This creates a simpler upload flow that uses a dedicated endpoint
+ * This uses Vercel's client-side upload that bypasses serverless function limits entirely
  */
+
+import { upload } from '@vercel/blob/client';
 
 export interface BlobUploadOptions {
   onProgress?: (progress: number) => void;
@@ -16,8 +18,8 @@ export interface BlobUploadResult {
 }
 
 /**
- * Upload a file using a dedicated blob upload endpoint
- * This bypasses the serverless function size limits for most files
+ * Upload a file using Vercel's client-side blob upload
+ * This bypasses serverless function size limits entirely
  */
 export async function uploadFileToBlob(
   file: File,
@@ -28,41 +30,38 @@ export async function uploadFileToBlob(
   try {
     onProgress?.(5);
     
-    // Create form data for the blob upload
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('filename', file.name);
-    formData.append('contentType', file.type);
+    console.log(`[Client Upload] Starting client-side upload for file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
     
-    onProgress?.(10);
-    
-    // Upload to dedicated blob endpoint
-    const response = await fetch('/api/blob/upload', {
-      method: 'POST',
-      body: formData,
-      signal,
+    // Upload directly to Vercel Blob using client-side upload
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/blob/upload-url',
+      clientPayload: JSON.stringify({
+        filename: file.name,
+        contentType: file.type,
+        size: file.size,
+      }),
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const progress = (progressEvent.loaded / progressEvent.total) * 100;
+          onProgress?.(5 + (progress * 0.90)); // Map to 5-95%
+        }
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
-      throw new Error(errorData.error || 'Failed to upload to blob storage');
-    }
-
-    onProgress?.(90);
-    
-    const result = await response.json();
-    
     onProgress?.(100);
+    
+    console.log(`[Client Upload] Upload completed successfully: ${blob.url}`);
 
     return {
-      url: result.url,
-      filename: result.filename || file.name,
+      url: blob.url,
+      filename: file.name,
       contentType: file.type,
       size: file.size,
     };
 
   } catch (error) {
-    console.error('Blob upload error:', error);
+    console.error('Client-side blob upload error:', error);
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
@@ -79,9 +78,9 @@ export async function uploadFileToBlob(
  * Check if a file should use direct blob upload based on size
  */
 export function shouldUseDirectBlobUpload(fileSize: number): boolean {
-  // Use direct blob upload for files larger than 2MB to avoid serverless limits
-  // Vercel has a ~4.5MB limit, but we use 2MB to be very safe and account for form data overhead
-  const threshold = 2 * 1024 * 1024; // 2MB
+  // Use client-side blob upload for files larger than 4MB to avoid serverless limits
+  // This provides a safety margin below Vercel's 4.5MB limit
+  const threshold = 4 * 1024 * 1024; // 4MB
   return fileSize > threshold;
 }
 

@@ -61,11 +61,12 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
 
       setUploadProgress(5);
 
-      // Check if we should use direct blob upload to avoid 413 errors
-      const useDirectBlob = shouldUseDirectBlobUpload(file.size) || options.saveToBlob;
+      // For files larger than 4.5MB, we must use blob upload
+      // For smaller files, try traditional upload first
+      const shouldTryBlob = shouldUseDirectBlobUpload(file.size) || options.saveToBlob;
       
-      if (useDirectBlob) {
-        console.log(`Using direct blob upload for large file (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+      if (shouldTryBlob) {
+        console.log(`File is too large for traditional upload (${(file.size / 1024 / 1024).toFixed(1)}MB), must use blob upload`);
         
         try {
           // Upload directly to blob storage
@@ -97,38 +98,44 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
 
           return processResult.document;
         } catch (blobError) {
-          console.error('Blob upload failed, this file is too large for the platform:', blobError);
-          throw new Error(`File too large for upload. The file size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds platform limits. Please try a smaller file or split the document into smaller parts.`);
+          console.error('Client-side blob upload failed:', blobError);
+          
+          // Provide a helpful error message based on the error
+          const errorMessage = blobError instanceof Error ? blobError.message : 'Unknown error';
+          
+          if (errorMessage.includes('too large') || errorMessage.includes('size')) {
+            throw new Error(`File too large for upload. Maximum size is 15MB for knowledge documents. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
+          } else if (errorMessage.includes('type') || errorMessage.includes('unsupported')) {
+            throw new Error(`Unsupported file type. Please upload PDF, DOCX, TXT, or Markdown files.`);
+          } else {
+            throw new Error(`Upload failed: ${errorMessage}`);
+          }
         }
       }
-
-      // Use traditional upload for smaller files
-      console.log('Using traditional upload for smaller file');
+      
+      // For smaller files, use traditional upload
+      console.log(`Using traditional upload for smaller file (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
       setUploadProgress(10);
 
       // Create form data
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('saveToBlob', 'false'); // Don't use blob storage for small files
+      formData.append('saveToBlob', 'false');
 
       setUploadProgress(20);
-      console.log('Starting fetch to /api/knowledge/upload');
 
       // Upload to knowledge endpoint
       const response = await fetch('/api/knowledge/upload', {
         method: 'POST',
         body: formData,
-      }).catch(fetchError => {
-        console.error('Fetch network error:', fetchError);
-        throw fetchError; // Re-throw to be caught by the main try-catch
       });
 
       // Handle 413 (Request Entity Too Large) specifically
       if (response.status === 413) {
-        throw new Error(`File too large for upload. Maximum size is 15MB for knowledge documents. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
+        console.error('Traditional upload failed with 413 error');
+        throw new Error(`File too large for traditional upload. Please try again with a smaller file or contact support if this issue persists.`);
       }
 
-      console.log('Fetch response received. Updating progress to 80%');
       setUploadProgress(80);
 
       // Check if response is actually JSON
