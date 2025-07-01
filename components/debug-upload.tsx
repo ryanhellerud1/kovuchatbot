@@ -81,6 +81,71 @@ export function DebugUpload() {
     }
   };
 
+  const testBlobUpload = async () => {
+    setIsLoading(true);
+    setLogs([]);
+    
+    try {
+      addLog('Starting blob upload test...');
+      
+      // Create a larger test file to trigger blob upload
+      const testContent = 'This is a large test document for blob upload testing.\n'.repeat(1000);
+      const testFile = new File([testContent], 'blob-test.txt', { type: 'text/plain' });
+      
+      addLog(`Large test file created: ${testFile.name} (${(testFile.size / 1024).toFixed(1)} KB, ${testFile.type})`);
+      
+      // Test blob upload
+      addLog('Testing blob upload...');
+      const formData = new FormData();
+      formData.append('file', testFile);
+      formData.append('filename', testFile.name);
+      formData.append('contentType', testFile.type);
+      
+      const uploadResponse = await fetch('/api/blob/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      addLog(`Upload response: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      
+      if (uploadResponse.ok) {
+        const uploadData = await uploadResponse.json();
+        addLog(`Upload data: ${JSON.stringify(uploadData, null, 2)}`);
+        addLog('✅ Blob upload successful!');
+        
+        // Test document processing from blob
+        addLog('Testing document processing from blob...');
+        const processResponse = await fetch('/api/knowledge/process-blob', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            blobUrl: uploadData.url,
+            filename: uploadData.originalFilename,
+          }),
+        });
+        
+        addLog(`Process response: ${processResponse.status} ${processResponse.statusText}`);
+        
+        if (processResponse.ok) {
+          const processData = await processResponse.json();
+          addLog(`Process data: ${JSON.stringify(processData, null, 2)}`);
+          addLog('✅ Document processing successful!');
+        } else {
+          const errorText = await processResponse.text();
+          addLog(`❌ Document processing failed: ${errorText}`);
+        }
+      } else {
+        const errorText = await uploadResponse.text();
+        addLog(`❌ Blob upload failed: ${errorText}`);
+      }
+      
+    } catch (error) {
+      addLog(`❌ Blob upload test failed: ${error}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const testFilesEndpoint = async () => {
     setIsLoading(true);
     setLogs([]);
@@ -134,13 +199,21 @@ export function DebugUpload() {
     <Card className="p-6 max-w-4xl mx-auto">
       <h2 className="text-xl font-semibold mb-4">Upload Debug Tool</h2>
       
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-4 mb-4 flex-wrap">
         <Button 
           onClick={testUpload} 
           disabled={isLoading}
           variant="default"
         >
           {isLoading ? 'Testing...' : 'Test Knowledge Upload'}
+        </Button>
+        
+        <Button 
+          onClick={testBlobUpload} 
+          disabled={isLoading}
+          variant="default"
+        >
+          {isLoading ? 'Testing...' : 'Test Blob Upload'}
         </Button>
         
         <Button 

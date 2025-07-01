@@ -3,9 +3,17 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   experimental: {
     ppr: true,
+    // Increase body size limit for file uploads
+    serverComponentsExternalPackages: ['pdf-parse'],
   },
   typescript: {
     ignoreBuildErrors: true,
+  },
+  // Configure body size limits for API routes
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
   },
   images: {
     remotePatterns: [

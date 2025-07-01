@@ -141,6 +141,13 @@ function PureMultimodalInput({
         body: formData,
       });
 
+      // Handle 413 (Request Entity Too Large) specifically
+      if (response.status === 413) {
+        const maxSize = isKnowledgeDocument ? '15MB' : '50MB';
+        toast.error(`File too large for upload. Maximum size is ${maxSize}. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
+        return;
+      }
+
       if (response.ok) {
         // Check if response is JSON
         const contentType = response.headers.get('content-type');

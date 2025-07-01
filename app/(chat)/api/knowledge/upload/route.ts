@@ -63,6 +63,10 @@ interface ErrorResponse {
   details?: string;
 }
 
+// Configure route for large file uploads
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds timeout for processing
+
 export async function POST(request: Request): Promise<NextResponse<UploadResponse | ErrorResponse>> {
   console.log('[Knowledge Upload] Starting upload request processing');
   

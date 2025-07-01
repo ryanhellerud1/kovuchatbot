@@ -43,6 +43,10 @@ const KnowledgeFileSchema = z.object({
     }),
 });
 
+// Configure route for large file uploads
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds timeout for processing
+
 export async function POST(request: Request) {
   const session = await auth();
 

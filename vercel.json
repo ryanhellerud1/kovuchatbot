@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "app/(chat)/api/knowledge/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "app/(chat)/api/files/upload/route.ts": {
+      "maxDuration": 60
+    }
+  },
+  "limits": {
+    "duration": 60000
+  }
+}

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { uploadFileToBlob, processKnowledgeDocumentFromBlob, shouldUseDirectBlobUpload } from '@/lib/blob-upload-client';
 
 export interface KnowledgeDocument {
   id: string;
@@ -55,22 +56,55 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
       // Validate file size (15MB limit for knowledge documents)
       const maxSize = 15 * 1024 * 1024; // 15MB
       if (file.size > maxSize) {
-        throw new Error('File size must be less than 15MB for knowledge documents.');
+        throw new Error(`File size must be less than 15MB for knowledge documents. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
       }
 
+      setUploadProgress(5);
+
+      // Check if we should use direct blob upload to avoid 413 errors
+      const useDirectBlob = shouldUseDirectBlobUpload(file.size) || options.saveToBlob;
+      
+      if (useDirectBlob) {
+        console.log(`Using direct blob upload for large file (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+        
+        // Upload directly to blob storage
+        const blobResult = await uploadFileToBlob(file, {
+          onProgress: (progress) => {
+            // Map blob upload progress to 5-70%
+            setUploadProgress(5 + (progress * 0.65));
+          }
+        });
+        
+        setUploadProgress(70);
+        console.log('File uploaded to blob storage, now processing...');
+        
+        // Process the document from blob storage
+        const processResult = await processKnowledgeDocumentFromBlob(
+          blobResult.url,
+          blobResult.filename
+        );
+        
+        setUploadProgress(100);
+        
+        if (!processResult.success) {
+          throw new Error(processResult.error || 'Failed to process document');
+        }
+        
+        toast.success(`Document "${processResult.document.title}" uploaded successfully!`, {
+          description: `Processed ${processResult.document.chunkCount} chunks for AI search.`,
+        });
+
+        return processResult.document;
+      }
+
+      // Use traditional upload for smaller files
+      console.log('Using traditional upload for smaller file');
       setUploadProgress(10);
 
       // Create form data
       const formData = new FormData();
       formData.append('file', file);
-      
-      // Automatically use blob storage for files larger than 4.5MB
-      const blobThreshold = 4.5 * 1024 * 1024; // 4.5MB
-      const shouldUseBlob = options.saveToBlob || file.size > blobThreshold;
-      
-      if (shouldUseBlob) {
-        formData.append('saveToBlob', 'true');
-      }
+      formData.append('saveToBlob', 'false'); // Don't use blob storage for small files
 
       setUploadProgress(20);
       console.log('Starting fetch to /api/knowledge/upload');
@@ -83,6 +117,11 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
         console.error('Fetch network error:', fetchError);
         throw fetchError; // Re-throw to be caught by the main try-catch
       });
+
+      // Handle 413 (Request Entity Too Large) specifically
+      if (response.status === 413) {
+        throw new Error(`File too large for upload. Maximum size is 15MB for knowledge documents. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
+      }
 
       console.log('Fetch response received. Updating progress to 80%');
       setUploadProgress(80);

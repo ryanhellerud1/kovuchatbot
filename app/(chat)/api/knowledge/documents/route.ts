@@ -6,6 +6,7 @@ import {
   getKnowledgeDocumentById,
   deleteKnowledgeDocument 
 } from '@/lib/db/queries';
+import { deleteFromBlob } from '@/lib/blob-storage';
 
 /**
  * GET /api/knowledge/documents
@@ -90,7 +91,20 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Delete document and all associated chunks
+    // Delete file from blob storage if it exists
+    if (document.fileUrl) {
+      try {
+        console.log(`[Delete Document] Deleting file from blob storage: ${document.fileUrl}`);
+        await deleteFromBlob(document.fileUrl);
+        console.log(`[Delete Document] Successfully deleted file from blob storage`);
+      } catch (blobError) {
+        console.error('Failed to delete file from blob storage:', blobError);
+        // Continue with database deletion even if blob deletion fails
+        // This prevents orphaned database records if the blob was already deleted manually
+      }
+    }
+
+    // Delete document and all associated chunks from database
     await deleteKnowledgeDocument(documentId, session.user.id);
 
     return NextResponse.json({
