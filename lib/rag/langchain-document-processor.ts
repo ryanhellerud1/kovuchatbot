@@ -6,6 +6,7 @@ import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { createLangChainEmbeddings } from '@/lib/ai/langchain-providers';
 import { withLangChainErrorHandling, withLangChainTiming } from '@/lib/ai/langchain-utils';
 import type { LangChainDocument } from '@/lib/ai/langchain-types';
+import { sanitizeTextPreserveFormatting, sanitizeMetadata, logSanitizationStats } from '@/lib/utils/text-sanitizer';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -92,7 +93,7 @@ export async function loadDocumentWithLangChain(
         // Create temporary file for LangChain loaders
         tempFilePath = await createTempFile(file, fileName);
         
-        let loader;
+        let loader: PDFLoader | DocxLoader | TextLoader;
         
         switch (fileType) {
           case 'pdf':
@@ -121,16 +122,26 @@ export async function loadDocumentWithLangChain(
           throw new Error('No content loaded from document');
         }
         
-        // Add file metadata to documents
+        // Sanitize document content and add file metadata
         documents.forEach((doc, index) => {
-          doc.metadata = {
+          // Sanitize the page content to remove null bytes and problematic characters
+          const originalContent = doc.pageContent;
+          doc.pageContent = sanitizeTextPreserveFormatting(originalContent);
+          
+          // Log sanitization if changes were made
+          if (originalContent !== doc.pageContent) {
+            logSanitizationStats(originalContent, doc.pageContent, `document ${index + 1}`);
+          }
+          
+          // Sanitize and add metadata
+          doc.metadata = sanitizeMetadata({
             ...doc.metadata,
             fileName,
             fileType,
             fileSize: file.length,
             loadedAt: new Date().toISOString(),
             documentIndex: index,
-          };
+          });
         });
         
         console.log(`[LangChain] Loaded ${documents.length} document(s) from ${fileName}`);
@@ -156,10 +167,10 @@ export async function splitDocumentsWithLangChain(
   return withLangChainErrorHandling('splitDocuments', async () => {
     return withLangChainTiming('splitDocuments', async () => {
       const textSplitter = new RecursiveCharacterTextSplitter({
-        chunkSize: config.chunkSize || DEFAULT_LANGCHAIN_CONFIG.chunkSize!,
-        chunkOverlap: config.chunkOverlap || DEFAULT_LANGCHAIN_CONFIG.chunkOverlap!,
-        separators: config.separators || DEFAULT_LANGCHAIN_CONFIG.separators!,
-        keepSeparator: config.keepSeparator || DEFAULT_LANGCHAIN_CONFIG.keepSeparator!,
+        chunkSize: config.chunkSize || DEFAULT_LANGCHAIN_CONFIG.chunkSize,
+        chunkOverlap: config.chunkOverlap || DEFAULT_LANGCHAIN_CONFIG.chunkOverlap,
+        separators: config.separators || DEFAULT_LANGCHAIN_CONFIG.separators,
+        keepSeparator: config.keepSeparator || DEFAULT_LANGCHAIN_CONFIG.keepSeparator,
         lengthFunction: config.lengthFunction,
       });
       
@@ -171,14 +182,23 @@ export async function splitDocumentsWithLangChain(
       const langchainDocs: LangChainDocument[] = splitDocs.map((doc, index) => {
         const langchainDoc = doc as LangChainDocument;
         
-        // Enhance metadata with chunk information
-        langchainDoc.metadata = {
+        // Sanitize chunk content
+        const originalContent = langchainDoc.pageContent;
+        langchainDoc.pageContent = sanitizeTextPreserveFormatting(originalContent);
+        
+        // Log sanitization if changes were made
+        if (originalContent !== langchainDoc.pageContent) {
+          logSanitizationStats(originalContent, langchainDoc.pageContent, `chunk ${index + 1}`);
+        }
+        
+        // Enhance and sanitize metadata with chunk information
+        langchainDoc.metadata = sanitizeMetadata({
           ...langchainDoc.metadata,
           chunkIndex: index,
-          chunkSize: doc.pageContent.length,
+          chunkSize: langchainDoc.pageContent.length,
           documentId: '', // Will be set when saving to database
           documentTitle: langchainDoc.metadata.fileName || 'Unknown Document',
-        };
+        });
         
         return langchainDoc;
       });
@@ -248,8 +268,14 @@ export async function processDocumentWithLangChain(
       
       // Step 4: Extract metadata and create summary
       const fullContent = loadedDocuments.map(doc => doc.pageContent).join('\n\n');
+      const sanitizedFullContent = sanitizeTextPreserveFormatting(fullContent);
       const title = fileName.replace(/\.[^/.]+$/, '');
-      const summary = generateSummary(fullContent);
+      const summary = generateSummary(sanitizedFullContent);
+      
+      // Log full content sanitization if changes were made
+      if (fullContent !== sanitizedFullContent) {
+        logSanitizationStats(fullContent, sanitizedFullContent, 'full document content');
+      }
       
       const processingTime = Date.now() - startTime;
       const avgChunkSize = splitDocuments.reduce((sum, doc) => sum + doc.pageContent.length, 0) / splitDocuments.length;
@@ -258,7 +284,7 @@ export async function processDocumentWithLangChain(
       
       return {
         title,
-        content: fullContent,
+        content: sanitizedFullContent,
         documents: splitDocuments,
         embeddings,
         fileType,

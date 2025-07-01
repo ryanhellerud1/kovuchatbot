@@ -19,7 +19,7 @@
 
 Kovu is a RAG (Retrieval-Augmented Generation) assistant. You can ask it questions about your documents, and it will use them to provide answers.
 
-To get started (ensure you have selected the **Kovu AI with Tools** model):
+To get started:
 1.  Upload your documents using the upload button via sidebar.
 2.  Ask a question in the chat box.
 3.  Kovu will search your documents and generate a relevant answer.
@@ -50,10 +50,9 @@ The RAG implementation in this project follows these steps:
 
 ## Model Providers
 
-This template is configured to use custom **Kovu AI** models out of the box:
+This template is configured to use **KovuAI** out of the box:
 
-- **Kovu AI Deep Think**: An advanced model focused on complex reasoning and generation.
-- **Kovu AI with Tools**: A model with capabilities for knowledge search and executing tools.
+- **KovuAI**: An advanced model with knowledge search and tool capabilities for comprehensive assistance.
 
 ### LangChain Integration (Experimental)
 

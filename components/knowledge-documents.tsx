@@ -275,9 +275,16 @@ export function KnowledgeDocumentsCompact({
     <div className={cn('space-y-1', className)}>
       {documents.slice(0, 5).map((document) => (
         <div
+          role="button"
+          tabIndex={0}
           key={document.id}
           className="flex items-center space-x-2 p-2 rounded hover:bg-muted cursor-pointer text-sm"
           onClick={() => onDocumentSelect?.(document as KnowledgeDocumentDisplay)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              onDocumentSelect?.(document as KnowledgeDocumentDisplay);
+            }
+          }}
         >
           <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center text-xs">
             <FileText className="h-3 w-3 text-primary" />

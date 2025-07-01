@@ -555,29 +555,60 @@ export async function getUserKnowledgeDocuments(
 }
 
 export async function getUserDocumentChunks(userId: string) {
-  try {
-    return await db
-      .select({
-        id: documentChunks.id,
-        documentId: documentChunks.documentId,
-        content: documentChunks.content,
-        embedding: documentChunks.embedding,
-        chunkIndex: documentChunks.chunkIndex,
-        chunkMetadata: documentChunks.chunkMetadata,
-        documentTitle: knowledgeDocuments.title,
-        createdAt: documentChunks.createdAt,
-      })
-      .from(documentChunks)
-      .innerJoin(
-        knowledgeDocuments,
-        eq(documentChunks.documentId, knowledgeDocuments.id),
-      )
-      .where(eq(knowledgeDocuments.userId, userId))
-      .orderBy(desc(documentChunks.createdAt));
-  } catch (error) {
-    console.error('Failed to get user document chunks from database');
-    throw error;
+  const maxRetries = 3;
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[getUserDocumentChunks] Attempt ${attempt}/${maxRetries} for user ${userId}`);
+      
+      const result = await db
+        .select({
+          id: documentChunks.id,
+          documentId: documentChunks.documentId,
+          content: documentChunks.content,
+          embedding: documentChunks.embedding,
+          chunkIndex: documentChunks.chunkIndex,
+          chunkMetadata: documentChunks.chunkMetadata,
+          documentTitle: knowledgeDocuments.title,
+          createdAt: documentChunks.createdAt,
+        })
+        .from(documentChunks)
+        .innerJoin(
+          knowledgeDocuments,
+          eq(documentChunks.documentId, knowledgeDocuments.id),
+        )
+        .where(eq(knowledgeDocuments.userId, userId))
+        .orderBy(desc(documentChunks.createdAt));
+
+      console.log(`[getUserDocumentChunks] Successfully retrieved ${result.length} chunks for user ${userId}`);
+      return result;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[getUserDocumentChunks] Attempt ${attempt}/${maxRetries} failed:`, error);
+      
+      // Check if it's a connection error that might benefit from retry
+      const isRetryableError = error instanceof Error && (
+        error.message.includes('ECONNRESET') ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('connection') ||
+        error.code === 'ECONNRESET'
+      );
+
+      if (!isRetryableError || attempt === maxRetries) {
+        console.error('Failed to get user document chunks from database');
+        throw error;
+      }
+
+      // Wait before retrying (exponential backoff)
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`[getUserDocumentChunks] Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
+
+  throw lastError!;
 }
 
 export async function getKnowledgeDocumentById(
@@ -641,7 +672,7 @@ export async function similaritySearch({
         AND dc.embedding IS NOT NULL
         AND (1 - (dc.embedding <=> ${`[${queryEmbedding.join(',')}]`})) >= ${minSimilarity}
       ORDER BY similarity DESC
-      LIMIT ${Math.min(k, 100)}
+      LIMIT ${Math.min(k, 50)}
     `;
 
     const results = await db.execute(vectorQuery);

@@ -1,3 +1,4 @@
+import { google } from '@ai-sdk/google';
 import {
   customProvider,
   extractReasoningMiddleware,
@@ -6,11 +7,7 @@ import {
 import { openai } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { isTestEnvironment } from '../constants';
-import {
-  artifactModel,
-  chatModel,
-  reasoningModel,
-} from './models.test';
+import { artifactModel, chatModel, reasoningModel } from './models.test';
 
 // Define the OpenRouter instance using the official provider
 const openrouter = createOpenRouter({
@@ -20,7 +17,7 @@ const openrouter = createOpenRouter({
   fetch: async (url, options) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
-    
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -28,9 +25,9 @@ const openrouter = createOpenRouter({
       });
       clearTimeout(timeoutId);
       return response;
-    } catch (error) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Request timeout - connection took too long');
       }
       throw error;
@@ -40,38 +37,55 @@ const openrouter = createOpenRouter({
 
 // Define the model identifier constants
 const QWEN3_MODEL_NAME = 'qwen/qwen3-32b:free';
-const TOOLS_MODEL_NAME = 'gpt-3.5-turbo'; // OpenAI model for tools
+const TOOLS_MODEL_NAME = 'models/gemini-2.5-flash-lite-preview-06-17';
 
 export const myProvider = isTestEnvironment
   ? customProvider({
       languageModels: {
-        'chat-model-reasoning-qwen3': wrapLanguageModel({
-          model: reasoningModel,
-          middleware: extractReasoningMiddleware({ tagName: 'think' }),
-        }),
+        // 'chat-model-reasoning-qwen3': wrapLanguageModel({
+        //   model: reasoningModel,
+        //   middleware: extractReasoningMiddleware({ tagName: 'think' }),
+        // }),
+        'chat-model': chatModel, // Add for test compatibility
         'chat-model-tools': chatModel,
         // Artifact models for document generation
         'artifact-model-qwen3': artifactModel, // Use mock artifact model for tests
         'artifact-model': artifactModel, // Use mock artifact model for tests
       },
       imageModels: {
-        'small-model': openai('dall-e-3'), // Use DALL-E for image generation (even in tests)
+        'small-model': {
+          ...openai.image('dall-e-3'),
+          maxImagesPerCall: 1,
+        },
       },
     })
   : customProvider({
       languageModels: {
         // Qwen3 reasoning model (Kovu AI Deep Think) - no tools
-        'chat-model-reasoning-qwen3': wrapLanguageModel({
-          model: openrouter(QWEN3_MODEL_NAME),
-          middleware: extractReasoningMiddleware({ tagName: 'think' }), 
-        }),
-        // OpenAI model with tool support
-        'chat-model-tools': openai(TOOLS_MODEL_NAME),
+        // 'chat-model-reasoning-qwen3': wrapLanguageModel({
+        //   model: openrouter(QWEN3_MODEL_NAME),
+        //   middleware: extractReasoningMiddleware({ tagName: 'think' }),
+        // }),
+        // Google Gemini model with tool support and error handling
+        'chat-model-tools': (() => {
+          try {
+            return google(TOOLS_MODEL_NAME);
+          } catch (error: unknown) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            console.error('Failed to initialize Gemini model:', message);
+            // Fallback to stable model
+            return google('models/gemini-1.5-flash');
+          }
+        })(),
         // Artifact models for document generation
         'artifact-model-qwen3': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts
         'artifact-model': openai(TOOLS_MODEL_NAME), // Fallback to OpenAI for sheets
       },
       imageModels: {
-        'small-model': openai('dall-e-3'), // Use DALL-E for image generation
+        'small-model': {
+          ...openai.image('dall-e-3'),
+          maxImagesPerCall: 1,
+        },
       },
     });

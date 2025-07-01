@@ -86,8 +86,11 @@ export class PostgreSQLVectorStore extends VectorStore {
         }
 
         // Prepare document chunks for database
+        if (!documentId) {
+          throw new Error('documentId is not set');
+        }
         const chunks = documents.map((doc, index) => ({
-          documentId: documentId!,
+          documentId: documentId,
           chunkIndex: index,
           content: doc.pageContent,
           embedding: embeddings[index],
@@ -281,14 +284,49 @@ export class PostgreSQLVectorStore extends VectorStore {
 }
 
 /**
- * Factory function to create PostgreSQL vector store
+ * Factory function to create PostgreSQL vector store with retry logic
  */
 export async function createPostgreSQLVectorStore(
   userId: string,
   embeddings?: Embeddings
 ): Promise<PostgreSQLVectorStore> {
-  const embeddingsInstance = embeddings || createLangChainEmbeddings();
-  return PostgreSQLVectorStore.fromExistingIndex(embeddingsInstance, userId);
+  const maxRetries = 3;
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[createPostgreSQLVectorStore] Attempt ${attempt}/${maxRetries} for user ${userId}`);
+      
+      const embeddingsInstance = embeddings || createLangChainEmbeddings();
+      const vectorStore = await PostgreSQLVectorStore.fromExistingIndex(embeddingsInstance, userId);
+      
+      console.log(`[createPostgreSQLVectorStore] Successfully created vector store for user ${userId}`);
+      return vectorStore;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[createPostgreSQLVectorStore] Attempt ${attempt}/${maxRetries} failed:`, error);
+      
+      // Check if it's a connection error that might benefit from retry
+      const isRetryableError = error instanceof Error && (
+        error.message.includes('ECONNRESET') ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('connection') ||
+        error.code === 'ECONNRESET'
+      );
+
+      if (!isRetryableError || attempt === maxRetries) {
+        throw error;
+      }
+
+      // Wait before retrying (exponential backoff)
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`[createPostgreSQLVectorStore] Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError!;
 }
 
 /**

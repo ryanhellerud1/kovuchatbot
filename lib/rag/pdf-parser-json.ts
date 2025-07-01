@@ -6,6 +6,7 @@
 import { writeFileSync, unlinkSync, } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { sanitizeTextPreserveFormatting } from '../utils/text-sanitizer';
 
 /**
  * Fix character spacing issues common in PDF extraction
@@ -160,8 +161,11 @@ export async function parsePDFWithJson(
             // Join text parts and clean up excessive spacing
             const rawText = textParts.join(' ').trim();
             
+            // Sanitize text to remove null bytes and other unwanted characters
+            const sanitizedText = sanitizeTextPreserveFormatting(rawText);
+
             // Fix common PDF parsing issues where characters are separated by spaces
-            extractedText = fixCharacterSpacing(rawText);
+            extractedText = fixCharacterSpacing(sanitizedText);
 
             if (!extractedText || extractedText.length === 0) {
               reject(new Error('No text content found in PDF'));
@@ -269,7 +273,11 @@ export async function parsePDFWithFile(
 
             // Fix character spacing issues
             const rawText = textParts.join(' ').trim();
-            const extractedText = fixCharacterSpacing(rawText);
+
+            // Sanitize text to remove null bytes and other unwanted characters
+            const sanitizedText = sanitizeTextPreserveFormatting(rawText);
+            
+            const extractedText = fixCharacterSpacing(sanitizedText);
 
             if (!extractedText || extractedText.length === 0) {
               reject(new Error('No text content found in PDF'));

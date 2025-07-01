@@ -48,9 +48,9 @@ const aiEquations = [
 
 // Helper function for random integer
 function getRandomInt(min: number, max: number): number {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  const newMin = Math.ceil(min);
+  const newMax = Math.floor(max);
+  return Math.floor(Math.random() * (newMax - newMin + 1)) + newMin;
 }
 
 export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps) {
@@ -139,7 +139,7 @@ export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps
           {/* Map over the content parts and render them */} 
           <div className="text-sm text-muted-foreground flex flex-wrap items-baseline"> 
             {contentParts.map((part, index) => (
-              <span key={index}>{part}</span> // Wrap in span for key and baseline alignment
+              <span key={`part-${processedWords}-${index}-${Math.random()}`}>{part}</span> // Wrap in span for key and baseline alignment
             ))}
           </div>
         </div>

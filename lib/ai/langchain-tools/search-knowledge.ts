@@ -4,6 +4,7 @@ import { searchKnowledgeBase } from '@/lib/rag/retriever';
 import { queryLangChainRAG } from '@/lib/rag/langchain-retrieval-chain';
 import type { LangChainToolContext } from '../langchain-types';
 import { shouldUseLangChain } from '../langchain-utils';
+import { getSearchResultTokenStats, formatTokenStats } from '@/lib/utils/token-counter';
 
 /**
  * LangChain version of the knowledge search tool
@@ -145,6 +146,10 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
           },
           relevanceScore: this.getRelevanceLabel(result.similarity),
         }));
+
+        // Calculate and log token usage
+        const tokenStats = getSearchResultTokenStats(formattedResults);
+        console.log(`[LangChain SearchKnowledge] ${formatTokenStats(tokenStats)}`);
 
         // Create a summary for the AI to use
         const summary = this.createSearchSummary(query, formattedResults);

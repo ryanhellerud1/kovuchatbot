@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   const { id, message, selectedChatModel } = requestBody;
-  if (!selectedChatModel || !['chat-model-reasoning-qwen3', 'chat-model-tools'].includes(selectedChatModel)) {
+  if (!selectedChatModel || !['chat-model-tools'].includes(selectedChatModel)) {
     return new Response('Invalid model selected', { status: 400 });
   }
 
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
 
             console.log('[API Route] Merging stream into dataStream...');
             await result.mergeIntoDataStream(dataStream, {
-              sendReasoning: selectedChatModel === 'chat-model-reasoning-qwen3',
+              sendReasoning: false, // No reasoning model available
             });
             console.log('[API Route] Stream merging finished successfully.');
             break; // Success, exit retry loop

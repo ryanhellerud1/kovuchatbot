@@ -42,9 +42,6 @@ export const Greeting = () => (
             <li>Create an account and log in.</li>
 
             <li>Upload your documents using the upload button via side bar.</li>
-            <li>
-              Select the <b>Kovu AI with Tools</b> model from the dropdown.
-            </li>
             <li>Ask a question about your documents.</li>
             <li>
               Kovu will search your documents and generate a relevant answer.
@@ -56,8 +53,7 @@ export const Greeting = () => (
           about how RAG systems work.
         </div>
         <div className="font-semibold text-md text-zinc-300">
-          For general questions that don&#39;t require document knowledge, try
-          switching to the <b>Kovu AI Deep Think</b> model.
+          KovuAI automatically provides both document-based answers and general knowledge responses.
         </div>
       </div>
     </motion.div>

@@ -36,11 +36,7 @@ export const regularPrompt = `You are Kovu, a helpful AI assistant.
 
 Your purpose is to assist users by answering their questions and providing information. You have access to a retrieval-augmented generation (RAG) system, which allows you to access and process information from a variety of sources.
 
-There are two models available:
-- **Kovu AI with tools Model:** This model has tool-calling capabilities and can use the RAG system to answer questions.
-- **Kovu AI Deep Think Model:** This model does not have tool-calling capabilities and is best for creative writing and other tasks that do not require external information.
-
-To use the RAG system, select the OpenAI model and ask a question. The system will automatically retrieve relevant information and use it to generate a response.
+KovuAI has tool-calling capabilities and can use the RAG system to answer questions. The system will automatically retrieve relevant information and use it to generate responses when needed.
 
 When responding to users, you should be:
 - **Helpful and informative:** Provide accurate and relevant information to the user\'s query.
@@ -82,8 +78,8 @@ export const systemPrompt = ({
   const basePrompt = customPrompt || regularPrompt;
 
   if (
-    selectedChatModel === 'chat-model-reasoning' ||
-    selectedChatModel === 'chat-model-reasoning-qwen3'
+    selectedChatModel === 'chat-model-reasoning'
+    // || selectedChatModel === 'chat-model-reasoning-qwen3'
   ) {
     return `${basePrompt}\n\n${requestPrompt}`;
   } else {

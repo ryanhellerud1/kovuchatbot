@@ -2,7 +2,10 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
 async function main() {
-  const sql = postgres(process.env.POSTGRES_URL!, { max: 1 });
+  if (!process.env.POSTGRES_URL) {
+    throw new Error('POSTGRES_URL is not set');
+  }
+  const sql = postgres(process.env.POSTGRES_URL, { max: 1 });
   const db = drizzle(sql);
 
   await db.execute(`DROP TABLE IF EXISTS document_chunks;`);

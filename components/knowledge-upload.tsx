@@ -156,6 +156,8 @@ export function KnowledgeUpload({
       />
       
       <div
+        role="button"
+        tabIndex={0}
         className={cn(
           'border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer',
           dragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25',
@@ -166,6 +168,11 @@ export function KnowledgeUpload({
         onDragOver={handleDrag}
         onDrop={handleDrop}
         onClick={openFileDialog}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            openFileDialog();
+          }
+        }}
       >
         {isUploading ? (
           <div className="space-y-4">

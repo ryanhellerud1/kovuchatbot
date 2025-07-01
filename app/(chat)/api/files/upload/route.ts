@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { auth } from '@/app/(auth)/auth';
 import { getFileType } from '@/lib/rag/retriever';
 import { 
-  validateFileSize, 
   validateKnowledgeDocumentSize,
   shouldUseBlobStorage, 
   uploadToBlob, 

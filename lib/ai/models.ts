@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'chat-model-reasoning-qwen3';
+export const DEFAULT_CHAT_MODEL: string = 'chat-model-tools';
 
 export interface ChatModel {
   id: string;
@@ -7,15 +7,15 @@ export interface ChatModel {
 }
 
 export const chatModels: Array<ChatModel> = [
-  {
-    id: 'chat-model-reasoning-qwen3',
-    name: 'Kovu AI Deep Think',
-    description: 'Kovu AI with advanced reasoning',
-  },
+  // {
+  //   id: 'chat-model-reasoning-qwen3',
+  //   name: 'Kovu AI Deep Think',
+  //   description: 'Kovu AI with advanced reasoning',
+  // },
   {
     id: 'chat-model-tools',
-    name: 'Kovu AI with Tools',
-    description: 'Kovu AI with knowledge search and tool capabilities',
+    name: 'KovuAI',
+    description: 'KovuAI with knowledge search and tool capabilities',
   },
   // LangChain models (experimental)
   {

@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
-import { searchKnowledgeBase } from '@/lib/rag/retriever';
-import { getUserDocumentChunks } from '@/lib/db/queries';
-import { generateEmbedding } from '@/lib/rag/retriever';
+import { searchKnowledgeBase, generateEmbedding } from '@/lib/rag/retriever';
 
 export async function GET(request: NextRequest) {
   try {
