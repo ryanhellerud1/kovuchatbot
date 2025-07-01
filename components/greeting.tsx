@@ -42,7 +42,11 @@ export const Greeting = () => (
             <li>Create an account and log in.</li>
 
             <li>Upload your documents using the upload button via side bar.</li>
-            <li>Ask a question about your documents.</li>
+            <li>
+              Ask a question about your documents. To trigger a search of your
+              documents, start your query with &quot;according to my
+              documents&quot;.
+            </li>
             <li>
               Kovu will search your documents and generate a relevant answer.
             </li>
@@ -51,9 +55,6 @@ export const Greeting = () => (
         <div>
           You can also try asking one of the initial questions to learn more
           about how RAG systems work.
-        </div>
-        <div className="font-semibold text-md text-zinc-300">
-          KovuAI automatically provides both document-based answers and general knowledge responses.
         </div>
       </div>
     </motion.div>
