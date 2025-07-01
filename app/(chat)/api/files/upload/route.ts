@@ -156,7 +156,7 @@ export async function POST(request: Request) {
     try {
       console.log(`Uploading attachment (size: ${formatFileSize(file.size)})`);
       
-      const blobFolder = getBlobFolder('attachment');
+      const blobFolder = getBlobFolder('attachment', session.user?.id);
       const data = await uploadToBlob(fileBuffer, filename, blobFolder, {
         access: 'public',
         addRandomSuffix: true,

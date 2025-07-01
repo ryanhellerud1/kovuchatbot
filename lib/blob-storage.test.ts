@@ -40,7 +40,8 @@ console.log('Filenames are different:', filename1 !== filename2); // Should be t
 
 // Test blob folder generation
 console.log('\nTesting blob folder generation...');
-console.log('Attachment folder:', getBlobFolder('attachment')); // Should be "attachments"
+console.log('Attachment folder (no user):', getBlobFolder('attachment')); // Should be "attachments"
+console.log('Attachment folder (with user):', getBlobFolder('attachment', 'user123')); // Should be "attachments/user123"
 console.log('Knowledge folder:', getBlobFolder('knowledge', 'user123')); // Should be "knowledge/user123"
 console.log('Artifact folder:', getBlobFolder('artifact', 'user456')); // Should be "artifacts/user456"
 

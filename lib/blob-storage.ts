@@ -141,7 +141,7 @@ export function formatFileSize(bytes: number): string {
 export function getBlobFolder(fileType: 'attachment' | 'knowledge' | 'artifact', userId?: string): string {
   switch (fileType) {
     case 'attachment':
-      return 'attachments';
+      return userId ? `attachments/${userId}` : 'attachments';
     case 'knowledge':
       return userId ? `knowledge/${userId}` : 'knowledge';
     case 'artifact':
