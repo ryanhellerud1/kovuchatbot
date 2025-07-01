@@ -55,7 +55,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (formDataError) {
+      console.error('Error parsing form data:', formDataError);
+      return NextResponse.json(
+        { 
+          error: 'Invalid form data',
+          details: 'Failed to parse multipart form data'
+        },
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+    }
+    
     const file = formData.get('file') as Blob;
     const uploadType = formData.get('type') as string || 'attachment'; // 'attachment' or 'knowledge'
 
@@ -165,8 +183,16 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      { error: 'Failed to process request' },
-      { status: 500 },
+      { 
+        error: 'Failed to process request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      },
     );
   }
 }

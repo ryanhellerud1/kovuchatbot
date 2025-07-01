@@ -142,8 +142,17 @@ function PureMultimodalInput({
       });
 
       if (response.ok) {
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const responseText = await response.text();
+          console.error('Non-JSON response received:', responseText);
+          toast.error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
+          return;
+        }
+
         const data = await response.json();
-        const { url, pathname, contentType, size } = data;
+        const { url, pathname, contentType: fileContentType, size } = data;
 
         // Show success message for large files
         if (size && size > 4.5 * 1024 * 1024) {
@@ -153,9 +162,19 @@ function PureMultimodalInput({
         return {
           url,
           name: pathname,
-          contentType: contentType,
+          contentType: fileContentType,
         };
       }
+      
+      // Handle error response
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text();
+        console.error('Non-JSON error response received:', responseText);
+        toast.error(`Server error: ${response.status} ${response.statusText}`);
+        return;
+      }
+      
       const { error } = await response.json();
       toast.error(error);
     } catch (error) {

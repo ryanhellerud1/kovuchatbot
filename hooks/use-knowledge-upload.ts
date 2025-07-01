@@ -87,6 +87,14 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
       console.log('Fetch response received. Updating progress to 80%');
       setUploadProgress(80);
 
+      // Check if response is actually JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text();
+        console.error('Non-JSON response received:', responseText);
+        throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
+      }
+
       const data: UploadResponse | UploadError = await response.json();
 
       if (!response.ok || !data.success) {
