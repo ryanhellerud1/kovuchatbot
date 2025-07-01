@@ -24,9 +24,6 @@ export const postRequestBodySchema = z.object({
       .optional(),
   }),
   selectedChatModel: z.enum([
-    'chat-model',
-    'chat-model-reasoning',
-    // 'chat-model-reasoning-qwen3',
     'chat-model-tools'
   ]),
   customPrompt: z.string().max(2000).optional(),
