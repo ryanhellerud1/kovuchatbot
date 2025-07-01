@@ -6,8 +6,5 @@
     "app/(chat)/api/files/upload/route.ts": {
       "maxDuration": 60
     }
-  },
-  "limits": {
-    "duration": 60000
   }
 }
