@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { uploadFileToBlob, processKnowledgeDocumentFromBlob, shouldUseDirectBlobUpload } from '@/lib/blob-upload-client';
 
@@ -69,8 +69,24 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
         console.log(`File is too large for traditional upload (${(file.size / 1024 / 1024).toFixed(1)}MB), must use blob upload`);
         
         try {
+          // Get user ID for proper folder structure
+          const userResponse = await fetch('/api/user');
+          if (!userResponse.ok) {
+            throw new Error('Failed to get user information');
+          }
+          const userData = await userResponse.json();
+          
+          // Generate unique filename for the user's knowledge folder
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          const extension = file.name.substring(file.name.lastIndexOf('.'));
+          const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.'));
+          const uniqueFilename = `${timestamp}_${randomSuffix}_${nameWithoutExt}${extension}`;
+          const pathname = `knowledge/${userData.userId}/${uniqueFilename}`;
+          
           // Upload directly to blob storage
           const blobResult = await uploadFileToBlob(file, {
+            pathname,
             onProgress: (progress) => {
               // Map blob upload progress to 5-70%
               setUploadProgress(5 + (progress * 0.65));
@@ -95,6 +111,9 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
           toast.success(`Document "${processResult.document.title}" uploaded successfully!`, {
             description: `Processed ${processResult.document.chunkCount} chunks for AI search.`,
           });
+          
+          // Notify all components to refresh their document list
+          window.dispatchEvent(new CustomEvent(KNOWLEDGE_DOCS_EVENTS.REFRESH));
 
           return processResult.document;
         } catch (blobError) {
@@ -160,6 +179,9 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
       toast.success(`Document "${successData.document.title}" uploaded successfully!`, {
         description: `Processed ${successData.document.chunkCount} chunks for AI search.`,
       });
+      
+      // Notify all components to refresh their document list
+      window.dispatchEvent(new CustomEvent(KNOWLEDGE_DOCS_EVENTS.REFRESH));
 
       return successData.document;
 
@@ -185,18 +207,41 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
   };
 }
 
+// Global event system for knowledge documents synchronization
+const KNOWLEDGE_DOCS_EVENTS = {
+  REFRESH: 'knowledge-docs-refresh',
+  DELETED: 'knowledge-docs-deleted',
+  UPLOADED: 'knowledge-docs-uploaded',
+} as const;
+
+// Helper function to trigger global refresh
+export function triggerKnowledgeDocsRefresh() {
+  window.dispatchEvent(new CustomEvent(KNOWLEDGE_DOCS_EVENTS.REFRESH));
+}
+
 // Hook for managing knowledge documents
 export function useKnowledgeDocuments() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchDocuments = useCallback(async (forceRefresh = false) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/knowledge/documents');
+      // Add cache busting parameter to ensure fresh data
+      const url = forceRefresh 
+        ? `/api/knowledge/documents?_t=${Date.now()}`
+        : '/api/knowledge/documents';
+        
+      const response = await fetch(url, {
+        // Disable caching for this request
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch documents');
@@ -230,6 +275,13 @@ export function useKnowledgeDocuments() {
       // Remove from local state
       setDocuments(prev => prev.filter(doc => doc.id !== documentId));
       
+      // Notify all other components about the deletion
+      window.dispatchEvent(
+        new CustomEvent(KNOWLEDGE_DOCS_EVENTS.DELETED, { 
+          detail: { id: documentId } 
+        })
+      );
+      
       toast.success('Document deleted successfully', {
         description: `"${data.deletedDocument?.title}" has been removed from your knowledge base.`,
       });
@@ -244,6 +296,30 @@ export function useKnowledgeDocuments() {
       return false;
     }
   }, []);
+
+  // Listen for global refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('[KnowledgeDocuments] Received global refresh event');
+      fetchDocuments(true);
+    };
+    
+    const handleDocDeleted = (event: CustomEvent<{id: string}>) => {
+      console.log(`[KnowledgeDocuments] Document deleted event: ${event.detail.id}`);
+      // Update local state without refetching
+      setDocuments(prev => prev.filter(doc => doc.id !== event.detail.id));
+    };
+    
+    // Add event listeners
+    window.addEventListener(KNOWLEDGE_DOCS_EVENTS.REFRESH, handleRefresh);
+    window.addEventListener(KNOWLEDGE_DOCS_EVENTS.DELETED, handleDocDeleted as EventListener);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener(KNOWLEDGE_DOCS_EVENTS.REFRESH, handleRefresh);
+      window.removeEventListener(KNOWLEDGE_DOCS_EVENTS.DELETED, handleDocDeleted as EventListener);
+    };
+  }, [fetchDocuments]);
 
   return {
     documents,

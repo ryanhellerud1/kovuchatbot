@@ -46,6 +46,13 @@ export async function GET(request: Request) {
       total: transformedDocuments.length,
       limit,
       offset,
+    }, {
+      headers: {
+        // Prevent caching to ensure fresh data
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
 
   } catch (error) {

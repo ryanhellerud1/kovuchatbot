@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, } from 'react';
-import { FileText, Trash2, Download, Calendar, HardDrive, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
+import { FileText, Trash2, Download, Calendar, HardDrive, Loader2, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useKnowledgeDocuments } from '@/hooks/use-knowledge-upload';
@@ -46,7 +46,8 @@ export function KnowledgeDocuments({
   const { documents, isLoading, error, fetchDocuments, deleteDocument } = useKnowledgeDocuments();
 
   useEffect(() => {
-    fetchDocuments();
+    // Force refresh on initial load to ensure we have the latest data
+    fetchDocuments(true);
   }, [fetchDocuments]);
 
   const formatFileSize = (bytes: number | null) => {
@@ -124,9 +125,21 @@ export function KnowledgeDocuments({
     <div className={cn('space-y-4', className)}>
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Knowledge Documents</h3>
-        <span className="text-sm text-muted-foreground">
-          {documents.length} document{documents.length !== 1 ? 's' : ''}
-        </span>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => fetchDocuments(true)}
+            title="Refresh documents"
+            className="h-8 w-8 p-0"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="sr-only">Refresh</span>
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {documents.length} document{documents.length !== 1 ? 's' : ''}
+          </span>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -234,7 +247,8 @@ export function KnowledgeDocumentsCompact({
   const { documents, isLoading, fetchDocuments } = useKnowledgeDocuments();
 
   useEffect(() => {
-    fetchDocuments();
+    // Force refresh on initial load to ensure we have the latest data
+    fetchDocuments(true);
   }, [fetchDocuments]);
 
   const getFileTypeIcon = (fileType: string | null) => {
@@ -265,14 +279,39 @@ export function KnowledgeDocumentsCompact({
 
   if (documents.length === 0) {
     return (
-      <div className={cn('p-2 text-center', className)}>
-        <p className="text-xs text-muted-foreground">No documents</p>
+      <div className={cn('p-2', className)}>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">No documents</p>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => fetchDocuments(true)}
+            title="Refresh documents"
+            className="h-6 w-6 p-0"
+          >
+            <RefreshCw className="h-3 w-3" />
+            <span className="sr-only">Refresh</span>
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className={cn('space-y-1', className)}>
+      <div className="flex items-center justify-between px-2 mb-1">
+        <span className="text-xs text-muted-foreground">Documents</span>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => fetchDocuments(true)}
+          title="Refresh documents"
+          className="h-6 w-6 p-0"
+        >
+          <RefreshCw className="h-3 w-3" />
+          <span className="sr-only">Refresh</span>
+        </Button>
+      </div>
       {documents.slice(0, 5).map((document) => (
         <div
           role="button"

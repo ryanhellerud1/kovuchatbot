@@ -23,17 +23,20 @@ export interface BlobUploadResult {
  */
 export async function uploadFileToBlob(
   file: File,
-  options: BlobUploadOptions = {}
+  options: BlobUploadOptions & { pathname?: string } = {}
 ): Promise<BlobUploadResult> {
-  const { onProgress, signal } = options;
+  const { onProgress, signal, pathname } = options;
 
   try {
     onProgress?.(5);
     
     console.log(`[Client Upload] Starting client-side upload for file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
     
+    // Generate pathname with proper folder structure if not provided
+    const uploadPathname = pathname || file.name;
+    
     // Upload directly to Vercel Blob using client-side upload
-    const blob = await upload(file.name, file, {
+    const blob = await upload(uploadPathname, file, {
       access: 'public',
       handleUploadUrl: '/api/blob/upload-url',
       clientPayload: JSON.stringify({
