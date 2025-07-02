@@ -4,7 +4,12 @@ import { Document } from '@langchain/core/documents';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { createPostgreSQLVectorStore } from './langchain-vector-store';
-import { getUserDocumentChunks, saveKnowledgeDocument, saveDocumentChunk } from '@/lib/db/queries';
+import {
+  getUserDocumentChunks,
+  getAdjacentChunksForDocuments,
+  saveKnowledgeDocument,
+  saveDocumentChunk,
+} from '@/lib/db/queries';
 import { processDocumentWithLangChain } from './langchain-document-processor';
 import { countTokensMultiple } from '@/lib/utils/token-counter';
 import { sanitizeTextPreserveFormatting, sanitizeMetadata, logSanitizationStats } from '@/lib/utils/text-sanitizer';
@@ -624,47 +629,56 @@ async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string
   if (!results.length) return results;
 
   const contextThreshold = 0.45;
-  const enhancedResults: SearchResult[] = [];
-  
-  // Fetch all user document chunks once to avoid multiple DB calls
-  const allUserChunks = await getUserDocumentChunks(userId);
+  const resultsForContext = results.filter(r => r.similarity >= contextThreshold);
 
-  for (const result of results) {
-    enhancedResults.push(result);
+  // If no results meet the threshold, return original results
+  if (resultsForContext.length === 0) {
+    return results;
+  }
 
-    if (result.similarity >= contextThreshold) {
-      try {
-        const adjacentChunks = getAdjacentChunks(
-          result.source.documentId,
-          result.source.chunkIndex,
-          allUserChunks, // Pass all chunks to the function
-          2
-        );
+  // Prepare list of chunks for which we need context
+  const chunksToGetContextFor = resultsForContext.map(r => ({
+    documentId: r.source.documentId,
+    chunkIndex: r.source.chunkIndex,
+  }));
 
-        for (const chunk of adjacentChunks) {
-          const distance = Math.abs(chunk.chunkIndex - result.source.chunkIndex);
-          const contextualSimilarity = Math.max(0.15, result.similarity - (0.1 * distance));
+  // Fetch all necessary adjacent chunks in a single, efficient query
+  const allAdjacentChunks = await getAdjacentChunksForDocuments(userId, chunksToGetContextFor);
 
-          enhancedResults.push({
-            id: `${result.id}_adjacent_${chunk.chunkIndex}`,
-            content: chunk.content,
-            similarity: contextualSimilarity,
-            source: {
-              documentId: result.source.documentId,
-              documentTitle: result.source.documentTitle,
-              chunkIndex: chunk.chunkIndex,
-            },
-            metadata: {
-              ...result.metadata,
-              isAdjacentContext: true,
-              originalChunkIndex: result.source.chunkIndex,
-              contextDistance: distance,
-            },
-          });
-        }
-      } catch (error) {
-        console.warn(`[enhanceWithAdjacentChunks] Failed to get adjacent chunks for ${result.id}:`, error);
+  const enhancedResults: SearchResult[] = [...results];
+
+  for (const result of resultsForContext) {
+    try {
+      const adjacentChunks = getAdjacentChunks(
+        result.source.documentId,
+        result.source.chunkIndex,
+        allAdjacentChunks, // Use the pre-fetched, targeted list of chunks
+        2
+      );
+
+      for (const chunk of adjacentChunks) {
+        const distance = Math.abs(chunk.chunkIndex - result.source.chunkIndex);
+        const contextualSimilarity = Math.max(0.15, result.similarity - (0.1 * distance));
+
+        enhancedResults.push({
+          id: `${result.id}_adjacent_${chunk.chunkIndex}`,
+          content: chunk.content,
+          similarity: contextualSimilarity,
+          source: {
+            documentId: result.source.documentId,
+            documentTitle: result.source.documentTitle,
+            chunkIndex: chunk.chunkIndex,
+          },
+          metadata: {
+            ...result.metadata,
+            isAdjacentContext: true,
+            originalChunkIndex: result.source.chunkIndex,
+            contextDistance: distance,
+          },
+        });
       }
+    } catch (error) {
+      console.warn(`[enhanceWithAdjacentChunks] Failed to get adjacent chunks for ${result.id}:`, error);
     }
   }
 

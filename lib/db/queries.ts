@@ -643,6 +643,52 @@ export async function getDocumentChunks(documentId: string) {
   }
 }
 
+export async function getAdjacentChunksForDocuments(
+  userId: string,
+  chunks: Array<{ documentId: string; chunkIndex: number }>,
+) {
+  if (chunks.length === 0) {
+    return [];
+  }
+
+  // Create an array of OR conditions for each chunk to get its neighbors
+  const orConditions = chunks.map(chunk =>
+    and(
+      eq(knowledgeDocuments.userId, userId),
+      eq(documentChunks.documentId, chunk.documentId),
+      inArray(documentChunks.chunkIndex, [
+        chunk.chunkIndex - 1,
+        chunk.chunkIndex + 1,
+      ]),
+    ),
+  );
+
+  try {
+    const result = await db
+      .select({
+        id: documentChunks.id,
+        documentId: documentChunks.documentId,
+        content: documentChunks.content,
+        embedding: documentChunks.embedding,
+        chunkIndex: documentChunks.chunkIndex,
+        chunkMetadata: documentChunks.chunkMetadata,
+        documentTitle: knowledgeDocuments.title,
+        createdAt: documentChunks.createdAt,
+      })
+      .from(documentChunks)
+      .innerJoin(
+        knowledgeDocuments,
+        eq(documentChunks.documentId, knowledgeDocuments.id),
+      )
+      .where(sql.join(orConditions, sql` OR `)); // Combine all conditions with OR
+
+    return result;
+  } catch (error) {
+    console.error('Failed to get adjacent chunks from database', error);
+    throw error;
+  }
+}
+
 export async function similaritySearch({
   queryEmbedding,
   userId,
