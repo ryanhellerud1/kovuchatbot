@@ -168,7 +168,6 @@ export const knowledgeDocuments = pgTable('knowledge_documents', {
     .notNull()
     .references(() => user.id),
   title: text('title').notNull(),
-  content: text('content'),
   fileUrl: text('file_url'),
   fileType: varchar('file_type', { length: 10 }), // 'pdf', 'txt', 'md', 'docx'
   fileSize: integer('file_size'),
