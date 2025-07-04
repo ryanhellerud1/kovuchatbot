@@ -262,7 +262,6 @@ export async function POST(request: Request): Promise<NextResponse<UploadRespons
         id: documentId,
         userId: session.user.id,
         title: processedDocument.title,
-        content: processedDocument.content,
         fileUrl,
         fileType: processedDocument.fileType,
         fileSize: processedDocument.fileSize,

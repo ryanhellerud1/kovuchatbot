@@ -466,7 +466,6 @@ export async function saveKnowledgeDocument({
   id,
   userId,
   title,
-  content,
   fileUrl,
   fileType,
   fileSize,
@@ -475,7 +474,6 @@ export async function saveKnowledgeDocument({
   id?: string;
   userId: string;
   title: string;
-  content?: string;
   fileUrl?: string;
   fileType?: string;
   fileSize?: number;
@@ -488,7 +486,6 @@ export async function saveKnowledgeDocument({
         id,
         userId,
         title,
-        content,
         fileUrl,
         fileType,
         fileSize,

@@ -122,7 +122,6 @@ export async function POST(request: Request): Promise<NextResponse<ProcessBlobRe
         id: documentId,
         userId: session.user.id,
         title: processedDocument.title,
-        content: processedDocument.content,
         fileUrl: blobUrl, // Store the blob URL
         fileType: processedDocument.fileType,
         fileSize: fileSize,
