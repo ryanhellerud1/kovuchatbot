@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+// useEffect no longer needed - SWR handles loading automatically
 import { FileText, Trash2, Download, Calendar, HardDrive, Loader2, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -43,12 +43,9 @@ export function KnowledgeDocuments({
   compact = false,
   onDocumentSelect 
 }: KnowledgeDocumentsProps) {
-  const { documents, isLoading, error, fetchDocuments, deleteDocument } = useKnowledgeDocuments();
+  const { documents, isLoading, error, refetch, deleteDocument } = useKnowledgeDocuments();
 
-  useEffect(() => {
-    // Force refresh on initial load to ensure we have the latest data
-    fetchDocuments(true);
-  }, [fetchDocuments]);
+  // No need for manual useEffect - SWR handles initial loading automatically
 
   const formatFileSize = (bytes: number | null) => {
     if (!bytes || bytes === 0) return '0 Bytes';
@@ -99,7 +96,7 @@ export function KnowledgeDocuments({
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={fetchDocuments}
+            onClick={() => refetch()}
             className="mt-3"
           >
             Try Again
@@ -129,7 +126,7 @@ export function KnowledgeDocuments({
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => fetchDocuments(true)}
+            onClick={() => refetch()}
             title="Refresh documents"
             className="h-8 w-8 p-0"
           >
@@ -244,12 +241,9 @@ export function KnowledgeDocumentsCompact({
   className,
   onDocumentSelect 
 }: KnowledgeDocumentsProps) {
-  const { documents, isLoading, fetchDocuments } = useKnowledgeDocuments();
+  const { documents, isLoading, refetch } = useKnowledgeDocuments();
 
-  useEffect(() => {
-    // Force refresh on initial load to ensure we have the latest data
-    fetchDocuments(true);
-  }, [fetchDocuments]);
+  // No need for manual useEffect - SWR handles initial loading automatically
 
   const getFileTypeIcon = (fileType: string | null) => {
     switch (fileType?.toLowerCase()) {
@@ -285,7 +279,7 @@ export function KnowledgeDocumentsCompact({
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => fetchDocuments(true)}
+            onClick={() => refetch()}
             title="Refresh documents"
             className="h-6 w-6 p-0"
           >
@@ -304,7 +298,7 @@ export function KnowledgeDocumentsCompact({
         <Button 
           variant="ghost" 
           size="sm" 
-          onClick={() => fetchDocuments(true)}
+          onClick={() => refetch()}
           title="Refresh documents"
           className="h-6 w-6 p-0"
         >
