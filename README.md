@@ -34,7 +34,7 @@ You can also try asking one of the initial questions to learn more about how RAG
 - **Customizable AI Models**: Natively supports "Kovu AI" models for advanced reasoning and tool usage, and is easily extensible to other providers.
 - **Document Handling**: Supports uploading and processing of various document formats for building the knowledge base.
 - **Styling with shadcn/ui & Tailwind CSS**: A modern and accessible UI built with the best-in-class tools for easy customization.
-- **PostgreSQL Database with JSON Embeddings**: Uses a standard PostgreSQL database to store chat history and vector embeddings (as JSON arrays), with an in-app similarity search.
+- **PostgreSQL Database with pgvector**: Uses a standard PostgreSQL database with the `pgvector` extension to store chat history and vector embeddings for efficient similarity search.
 - **Authentication**: Secure user authentication handled by [Auth.js](https://authjs.dev).
 
 ## RAG Architecture
@@ -43,8 +43,8 @@ The RAG implementation in this project follows these steps:
 1.  **Document Upload**: Users can upload documents through the UI.
 2.  **Processing & Chunking**: The documents are parsed and split into smaller, manageable chunks of text.
 3.  **Embedding Generation**: Each text chunk is converted into a vector embedding using a sentence-transformer model.
-4.  **Vector Storage**: The embeddings are stored as a JSON array in a PostgreSQL database alongside the text chunks.
-5.  **Retrieval**: When a user sends a message, the application fetches all document chunks for the user and performs a cosine similarity search in-memory to find the most relevant ones.
+4.  **Vector Storage**: The embeddings are stored in a `vector` column in a PostgreSQL database alongside the text chunks.
+5.  **Retrieval**: When a user sends a message, the application performs a cosine similarity search using the `pgvector` extension to find the most relevant document chunks.
 6.  **Context Injection**: The retrieved text chunks are injected into the prompt as context for the language model.
 7.  **Generation**: The LLM generates a response that is grounded in the provided context, resulting in more accurate and relevant answers.
 
