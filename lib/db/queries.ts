@@ -648,20 +648,43 @@ export async function getAdjacentChunksForDocuments(
     return [];
   }
 
-  // Create an array of OR conditions for each chunk to get its neighbors
-  const orConditions = chunks.map(chunk =>
-    and(
-      eq(knowledgeDocuments.userId, userId),
-      eq(documentChunks.documentId, chunk.documentId),
-      inArray(documentChunks.chunkIndex, [
-        chunk.chunkIndex - 1,
-        chunk.chunkIndex + 1,
-      ]),
-    ),
-  );
-
   try {
-    const result = await db
+    // Use the optimized database function for better performance
+    const chunksJson = JSON.stringify(chunks);
+    const optimizedQuery = sql`
+      SELECT
+        id,
+        document_id as "documentId",
+        content,
+        chunk_index as "chunkIndex",
+        chunk_metadata as "chunkMetadata",
+        document_title as "documentTitle",
+        created_at as "createdAt"
+      FROM get_adjacent_chunks_optimized(
+        ${userId}::UUID,
+        ${chunksJson}::JSONB
+      )
+    `;
+
+    const result = await db.execute(optimizedQuery);
+    console.log(`[getAdjacentChunksForDocuments] Found ${result.length} adjacent chunks using optimized function`);
+    return result as unknown as typeof result;
+  } catch (error) {
+    console.error('Optimized adjacent chunks search failed, falling back to legacy method:', error);
+    
+    // Fallback to original method if optimized function fails
+    const orConditions = chunks.map(chunk =>
+      and(
+        eq(knowledgeDocuments.userId, userId),
+        eq(documentChunks.documentId, chunk.documentId),
+        inArray(documentChunks.chunkIndex, [
+          chunk.chunkIndex - 1,
+          chunk.chunkIndex + 1,
+        ]),
+      ),
+    );
+
+    const fallbackResult = await db
       .select({
         id: documentChunks.id,
         documentId: documentChunks.documentId,
@@ -679,10 +702,8 @@ export async function getAdjacentChunksForDocuments(
       )
       .where(sql.join(orConditions, sql` OR `)); // Combine all conditions with OR
 
-    return result;
-  } catch (error) {
-    console.error('Failed to get adjacent chunks from database', error);
-    throw error;
+    console.log(`[getAdjacentChunksForDocuments] Fallback found ${fallbackResult.length} adjacent chunks`);
+    return fallbackResult;
   }
 }
 
@@ -698,8 +719,33 @@ export async function similaritySearch({
   minSimilarity?: number;
 }) {
   try {
-    // Use pgvector extension for similarity search with minimum threshold
+    // Use the optimized database function for better performance
     const vectorQuery = sql`
+      SELECT
+        id,
+        document_id as "documentId",
+        content,
+        chunk_index as "chunkIndex",
+        chunk_metadata as "chunkMetadata",
+        document_title as "documentTitle",
+        created_at as "createdAt",
+        similarity
+      FROM search_knowledge_optimized(
+        ${userId}::UUID, 
+        ${`[${queryEmbedding.join(',')}]`}::vector(1536), 
+        ${Math.min(k, 50)}, 
+        ${minSimilarity}
+      )
+    `;
+
+    const results = await db.execute(vectorQuery);
+    console.log(`[similaritySearch] Found ${results.length} results above similarity threshold ${minSimilarity} using optimized function`);
+    return results as unknown as DocumentChunk[];
+  } catch (error) {
+    console.error('Optimized similarity search failed, falling back to legacy method:', error);
+    
+    // Fallback to original method if optimized function fails
+    const fallbackQuery = sql`
       SELECT
         dc.id,
         dc.document_id as "documentId",
@@ -718,12 +764,9 @@ export async function similaritySearch({
       LIMIT ${Math.min(k, 50)}
     `;
 
-    const results = await db.execute(vectorQuery);
-    console.log(`[similaritySearch] Found ${results.length} results above similarity threshold ${minSimilarity}`);
-    return results as unknown as DocumentChunk[];
-  } catch (error) {
-    console.error('Vector similarity search failed:', error);
-    throw new Error('Vector similarity search is not available. Please ensure pgvector extension is installed.');
+    const fallbackResults = await db.execute(fallbackQuery);
+    console.log(`[similaritySearch] Fallback found ${fallbackResults.length} results`);
+    return fallbackResults as unknown as DocumentChunk[];
   }
 }
 
@@ -746,5 +789,83 @@ export async function deleteKnowledgeDocument(
   } catch (error) {
     console.error('Failed to delete knowledge document from database');
     throw error;
+  }
+}
+
+// New optimized utility functions
+
+/**
+ * Get knowledge base size and statistics for a user using optimized function
+ */
+export async function getKnowledgeBaseStats(userId: string) {
+  try {
+    const statsQuery = sql`
+      SELECT * FROM get_knowledge_base_size(${userId}::UUID)
+    `;
+    
+    const [stats] = await db.execute(statsQuery);
+    console.log(`[getKnowledgeBaseStats] Retrieved stats for user ${userId}`);
+    return stats as {
+      total_documents: number;
+      total_chunks: number;
+      total_size_bytes: number;
+      avg_chunk_size_bytes: number;
+      embedding_storage_bytes: number;
+    };
+  } catch (error) {
+    console.error('Failed to get knowledge base stats:', error);
+    // Fallback to manual calculation
+    const documents = await getUserKnowledgeDocuments(userId);
+    const chunks = await getUserDocumentChunks(userId);
+    
+    return {
+      total_documents: documents.length,
+      total_chunks: chunks.length,
+      total_size_bytes: chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
+      avg_chunk_size_bytes: chunks.length > 0 ? Math.round(chunks.reduce((sum, chunk) => sum + chunk.content.length, 0) / chunks.length) : 0,
+      embedding_storage_bytes: chunks.length * 1536 * 4, // Estimated
+    };
+  }
+}
+
+/**
+ * Refresh optimization data (materialized views, statistics, cache cleanup)
+ */
+export async function refreshOptimizationData() {
+  try {
+    const refreshQuery = sql`SELECT refresh_optimization_data()`;
+    await db.execute(refreshQuery);
+    console.log('[refreshOptimizationData] Successfully refreshed optimization data');
+    return true;
+  } catch (error) {
+    console.error('Failed to refresh optimization data:', error);
+    return false;
+  }
+}
+
+/**
+ * Get search performance summary for a user
+ */
+export async function getSearchPerformanceSummary(userId: string, days = 7) {
+  try {
+    const perfQuery = sql`
+      SELECT * FROM get_search_performance_summary(${userId}::UUID, ${days})
+    `;
+    
+    const [summary] = await db.execute(perfQuery);
+    return summary as {
+      avg_execution_time_ms: number;
+      total_queries: number;
+      cache_hit_rate: number;
+      avg_result_count: number;
+    };
+  } catch (error) {
+    console.error('Failed to get search performance summary:', error);
+    return {
+      avg_execution_time_ms: 0,
+      total_queries: 0,
+      cache_hit_rate: 0,
+      avg_result_count: 0,
+    };
   }
 }
