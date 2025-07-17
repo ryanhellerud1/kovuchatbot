@@ -1,0 +1,36 @@
+{
+  "name": "@kovachat/db-migrations",
+  "version": "1.0.0",
+  "description": "Database performance optimization migrations for KovaChat knowledge base",
+  "main": "index.js",
+  "scripts": {
+    "migrate": "./run_migrations.sh",
+    "verify": "psql -f verify_performance.sql",
+    "setup": "npm run migrate && npm run verify",
+    "clean": "psql -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'",
+    "reset": "npm run clean && npm run setup"
+  },
+  "keywords": [
+    "postgresql",
+    "performance",
+    "optimization",
+    "migrations",
+    "pgvector",
+    "knowledge-base"
+  ],
+  "author": "KovaChat Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kovachat/kovachat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kovachat/kovachat/issues"
+  },
+  "homepage": "https://github.com/kovachat/kovachat#readme"
+}
