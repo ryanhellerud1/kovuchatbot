@@ -2,7 +2,11 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { Session } from 'next-auth';
 import { searchKnowledgeBase, type SearchResult } from '@/lib/rag/retriever';
-import { getSearchResultTokenStats, formatTokenStats, countTokens } from '@/lib/utils/token-counter';
+import {
+  getSearchResultTokenStats,
+  formatTokenStats,
+  countTokens,
+} from '@/lib/utils/token-counter';
 
 interface SearchKnowledgeProps {
   session: Session;
@@ -55,7 +59,7 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
 
       try {
         console.log(`[searchKnowledge] Starting search for query: "${query}"`);
-        
+
         // Validate parameters
         const validatedLimit = Math.min(Math.max(limit, 1), 25);
         let validatedSimilarity = Math.min(Math.max(minSimilarity, 0.0), 1.0);
@@ -63,9 +67,11 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
         // Adjust threshold dynamically based on query characteristics
         if (dynamicThreshold) {
           const queryTokens = query.split(/\s+/).length;
-          const hasSpecificTerms = /\b(what|how|why|when|where|who|which)\b/i.test(query);
-          const hasQuotes = query.includes('"') || query.includes('"') || query.includes('"');
-          
+          const hasSpecificTerms =
+            /\b(what|how|why|when|where|who|which)\b/i.test(query);
+          const hasQuotes =
+            query.includes('"') || query.includes('"') || query.includes('"');
+
           // Balanced threshold adjustment with more context budget available
           if (queryTokens < 3) {
             // Broader search for short queries
@@ -80,13 +86,13 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
             // Keep threshold higher for very long queries
             validatedSimilarity = Math.min(0.4, validatedSimilarity + 0.05);
           }
-          
+
           // Balanced adjustments based on query characteristics
           if (hasSpecificTerms) {
             // Questions need broader search
             validatedSimilarity = Math.max(0.18, validatedSimilarity - 0.05);
           }
-          
+
           if (hasQuotes) {
             // Quoted searches indicate user wants exact matches
             validatedSimilarity = Math.max(0.16, validatedSimilarity - 0.07);
@@ -95,26 +101,41 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
 
         // Remove the forced low threshold that was causing too many results
         // Keep the calculated threshold to maintain quality
-        
-        console.log(`[searchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`);
+
+        console.log(
+          `[searchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`,
+        );
 
         // Check database health before searching
-        const { performDatabaseHealthCheck } = await import('@/lib/db/health-check');
+        const { performDatabaseHealthCheck } = await import(
+          '@/lib/db/health-check'
+        );
         const healthCheck = await performDatabaseHealthCheck();
-        
+
         if (!healthCheck.isHealthy) {
-          console.error('[searchKnowledge] Database health check failed:', healthCheck.error);
-          throw new Error('Database connection is not healthy. Please try again later.');
+          console.error(
+            '[searchKnowledge] Database health check failed:',
+            healthCheck.error,
+          );
+          throw new Error(
+            'Database connection is not healthy. Please try again later.',
+          );
         }
 
         // Search the user's knowledge base using LangChain
-        const searchResults = await searchKnowledgeBase(query, session.user.id, {
-          limit: validatedLimit,
-          minSimilarity: validatedSimilarity,
-          includeMetadata: true,
-        });
+        const searchResults = await searchKnowledgeBase(
+          query,
+          session.user.id,
+          {
+            limit: validatedLimit,
+            minSimilarity: validatedSimilarity,
+            includeMetadata: true,
+          },
+        );
 
-        console.log(`[searchKnowledge] Search completed. Found ${searchResults.length} results`);
+        console.log(
+          `[searchKnowledge] Search completed. Found ${searchResults.length} results`,
+        );
 
         // If no results found
         if (searchResults.length === 0) {
@@ -153,11 +174,12 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
           (result: SearchResult, index: number) => {
             // Truncate very long content to prevent context overflow
             const maxContentLength = 2400; // Allow longer chunks since we have more context budget
-            const truncatedContent = result.content.length > maxContentLength 
-              ? `${result.content.substring(0, maxContentLength)}...` 
-              : result.content;
-            
-            return {
+            const truncatedContent =
+              result.content.length > maxContentLength
+                ? `${result.content.substring(0, maxContentLength)}...`
+                : result.content;
+
+            const baseResult = {
               rank: index + 1,
               content: truncatedContent,
               similarity: Math.round(result.similarity * 100) / 100, // Round to 2 decimal places
@@ -167,38 +189,71 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
                 section: `Chunk ${result.source.chunkIndex + 1}`,
               },
               relevanceScore: getRelevanceLabel(result.similarity),
-              keywordBoost: result.keywordBoost ? Math.round(result.keywordBoost * 100) / 100 : undefined,
+              keywordBoost: result.keywordBoost
+                ? Math.round(result.keywordBoost * 100) / 100
+                : undefined,
               contentLength: truncatedContent.length,
               originalLength: result.content.length,
               // Add preview of content for better context
-              preview: truncatedContent.length > 200 ? `${truncatedContent.substring(0, 200)}...` : truncatedContent,
+              preview:
+                truncatedContent.length > 200
+                  ? `${truncatedContent.substring(0, 200)}...`
+                  : truncatedContent,
             };
-          }
+
+            // Add EPUB-specific context if available
+            if (
+              result.metadata?.fileType === 'epub' &&
+              result.metadata?.chapterInfo
+            ) {
+              baseResult.source.section = `Chapter: ${result.metadata.chapterInfo.chapterTitle || `Chapter ${result.metadata.chapterInfo.chapterOrder + 1}`}`;
+              baseResult.source.chapterOrder =
+                result.metadata.chapterInfo.chapterOrder;
+              baseResult.source.bookInfo = {
+                author: result.metadata.epubAuthor,
+                publisher: result.metadata.epubPublisher,
+                language: result.metadata.epubLanguage,
+              };
+            }
+
+            return baseResult;
+          },
         );
 
         // Calculate token usage for the formatted results
         const initialTokenStats = getSearchResultTokenStats(formattedResults);
-        console.log(`[searchKnowledge] Initial results: ${formatTokenStats(initialTokenStats)}`);
+        console.log(
+          `[searchKnowledge] Initial results: ${formatTokenStats(initialTokenStats)}`,
+        );
 
         // Check total content length and further limit if necessary
         let finalResults = formattedResults;
-        const totalContentLength = formattedResults.reduce((sum, result) => sum + result.contentLength, 0);
+        const totalContentLength = formattedResults.reduce(
+          (sum, result) => sum + result.contentLength,
+          0,
+        );
         const maxTotalContent = 48000; // Allow more content since context limit is ~15k tokens
         const maxTotalTokens = 12000; // Target token limit for search results
-        
+
         // Check both character and token limits
-        const needsLimiting = totalContentLength > maxTotalContent || initialTokenStats.totalTokens > maxTotalTokens;
-        
+        const needsLimiting =
+          totalContentLength > maxTotalContent ||
+          initialTokenStats.totalTokens > maxTotalTokens;
+
         if (needsLimiting) {
-          console.log(`[searchKnowledge] Content exceeds limits - chars: ${totalContentLength}/${maxTotalContent}, tokens: ${initialTokenStats.totalTokens}/${maxTotalTokens}`);
+          console.log(
+            `[searchKnowledge] Content exceeds limits - chars: ${totalContentLength}/${maxTotalContent}, tokens: ${initialTokenStats.totalTokens}/${maxTotalTokens}`,
+          );
           let currentLength = 0;
           let currentTokens = 0;
           finalResults = [];
-          
+
           for (const result of formattedResults) {
             const resultTokens = countTokens(result.content);
-            if (currentLength + result.contentLength <= maxTotalContent && 
-                currentTokens + resultTokens <= maxTotalTokens) {
+            if (
+              currentLength + result.contentLength <= maxTotalContent &&
+              currentTokens + resultTokens <= maxTotalTokens
+            ) {
               finalResults.push(result);
               currentLength += result.contentLength;
               currentTokens += resultTokens;
@@ -206,18 +261,26 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
               break;
             }
           }
-          
-          console.log(`[searchKnowledge] Limited to ${finalResults.length} results: ${currentLength} chars, ${currentTokens} tokens`);
+
+          console.log(
+            `[searchKnowledge] Limited to ${finalResults.length} results: ${currentLength} chars, ${currentTokens} tokens`,
+          );
         }
 
         // Calculate final token statistics
         const finalTokenStats = getSearchResultTokenStats(finalResults);
-        console.log(`[searchKnowledge] Final results: ${formatTokenStats(finalTokenStats)}`);
-        
+        console.log(
+          `[searchKnowledge] Final results: ${formatTokenStats(finalTokenStats)}`,
+        );
+
         // Log token efficiency
-        const tokenEfficiency = finalTokenStats.totalTokens > 0 ?
-          Math.round((finalTokenStats.totalTokens / maxTotalTokens) * 100) : 0; // % of token budget used
-        console.log(`[searchKnowledge] Token budget utilization: ${tokenEfficiency}% (${finalTokenStats.totalTokens}/${maxTotalTokens} tokens)`);
+        const tokenEfficiency =
+          finalTokenStats.totalTokens > 0
+            ? Math.round((finalTokenStats.totalTokens / maxTotalTokens) * 100)
+            : 0; // % of token budget used
+        console.log(
+          `[searchKnowledge] Token budget utilization: ${tokenEfficiency}% (${finalTokenStats.totalTokens}/${maxTotalTokens} tokens)`,
+        );
 
         // Create a summary for the AI to use
         const summary = createSearchSummary(query, finalResults);
@@ -233,12 +296,17 @@ export const searchKnowledge = ({ session }: SearchKnowledgeProps) =>
             minSimilarity: validatedSimilarity,
           },
           contentStats: {
-            totalContentLength: finalResults.reduce((sum, result) => sum + result.contentLength, 0),
+            totalContentLength: finalResults.reduce(
+              (sum, result) => sum + result.contentLength,
+              0,
+            ),
             totalTokens: finalTokenStats.totalTokens,
             averageTokensPerResult: finalTokenStats.averageTokensPerResult,
             tokenToCharRatio: finalTokenStats.tokenToCharRatio,
             tokenBudgetUsed: tokenEfficiency,
-            truncatedResults: finalResults.filter(r => r.originalLength > r.contentLength).length,
+            truncatedResults: finalResults.filter(
+              (r) => r.originalLength > r.contentLength,
+            ).length,
           },
           message: `Found ${finalResults.length} relevant result${finalResults.length === 1 ? '' : 's'} in your knowledge base${finalResults.length < searchResults.length ? ` (limited from ${searchResults.length} to prevent context overflow)` : ''}. Using ${finalTokenStats.totalTokens} tokens (${tokenEfficiency}% of budget).`,
         };
@@ -264,13 +332,19 @@ import { getUserDocumentChunks } from '@/lib/db/queries';
 async function userHasDocuments(userId: string): Promise<boolean> {
   try {
     const chunks = await getUserDocumentChunks(userId);
-    console.log(`[userHasDocuments] User ${userId} has ${chunks.length} document chunks`);
-    
+    console.log(
+      `[userHasDocuments] User ${userId} has ${chunks.length} document chunks`,
+    );
+
     if (chunks.length > 0) {
-      const chunksWithEmbeddings = chunks.filter(chunk => chunk.embedding && Array.isArray(chunk.embedding));
-      console.log(`[userHasDocuments] ${chunksWithEmbeddings.length} chunks have valid embeddings`);
+      const chunksWithEmbeddings = chunks.filter(
+        (chunk) => chunk.embedding && Array.isArray(chunk.embedding),
+      );
+      console.log(
+        `[userHasDocuments] ${chunksWithEmbeddings.length} chunks have valid embeddings`,
+      );
     }
-    
+
     return chunks.length > 0;
   } catch (error) {
     console.error('Error checking user documents:', error);

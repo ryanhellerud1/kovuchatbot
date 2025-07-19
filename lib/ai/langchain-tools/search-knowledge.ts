@@ -4,7 +4,10 @@ import { searchKnowledgeBase } from '@/lib/rag/retriever';
 import { queryLangChainRAG } from '@/lib/rag/langchain-retrieval-chain';
 import type { LangChainToolContext } from '../langchain-types';
 import { shouldUseLangChain } from '../langchain-utils';
-import { getSearchResultTokenStats, formatTokenStats } from '@/lib/utils/token-counter';
+import {
+  getSearchResultTokenStats,
+  formatTokenStats,
+} from '@/lib/utils/token-counter';
 
 /**
  * LangChain version of the knowledge search tool
@@ -19,7 +22,9 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
   schema = z.object({
     query: z
       .string()
-      .describe("The search query to find relevant content in the user's documents"),
+      .describe(
+        "The search query to find relevant content in the user's documents",
+      ),
     limit: z
       .number()
       .optional()
@@ -42,7 +47,12 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
   }
 
   async _call(input: z.infer<typeof this.schema>): Promise<string> {
-    const { query, limit = 5, minSimilarity = 0.4, dynamicThreshold = true } = input;
+    const {
+      query,
+      limit = 5,
+      minSimilarity = 0.4,
+      dynamicThreshold = true,
+    } = input;
 
     // Ensure user is authenticated
     if (!this.context.userId) {
@@ -53,8 +63,10 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
     }
 
     try {
-      console.log(`[LangChain SearchKnowledge] Starting search for query: "${query}"`);
-      
+      console.log(
+        `[LangChain SearchKnowledge] Starting search for query: "${query}"`,
+      );
+
       // Validate parameters
       const validatedLimit = Math.min(Math.max(limit, 1), 10);
       let validatedSimilarity = Math.min(Math.max(minSimilarity, 0.0), 1.0);
@@ -72,25 +84,25 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
         // For medium queries (3-7 words), keep the original threshold
       }
 
-      console.log(`[LangChain SearchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`);
+      console.log(
+        `[LangChain SearchKnowledge] Using similarity threshold: ${validatedSimilarity} (original: ${minSimilarity})`,
+      );
 
       // Check if we should use LangChain RAG or legacy implementation
       const useLangChainRAG = shouldUseLangChain('langchain-gpt-3.5-turbo');
-      
+
       if (useLangChainRAG) {
-        console.log('[LangChain SearchKnowledge] Using LangChain RAG implementation');
-        
-        // Use LangChain RAG for enhanced search
-        const ragResult = await queryLangChainRAG(
-          this.context.userId,
-          query,
-          {
-            retrievalK: validatedLimit,
-            scoreThreshold: validatedSimilarity,
-            modelId: 'langchain-gpt-3.5-turbo',
-            temperature: 0.1,
-          }
+        console.log(
+          '[LangChain SearchKnowledge] Using LangChain RAG implementation',
         );
+
+        // Use LangChain RAG for enhanced search
+        const ragResult = await queryLangChainRAG(this.context.userId, query, {
+          retrievalK: validatedLimit,
+          scoreThreshold: validatedSimilarity,
+          modelId: 'langchain-gpt-3.5-turbo',
+          temperature: 0.1,
+        });
 
         // Format response in expected format
         const response = {
@@ -110,7 +122,7 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
         return JSON.stringify(response);
       } else {
         console.log('[LangChain SearchKnowledge] Using legacy implementation');
-        
+
         // Use legacy search implementation
         const searchResults = await searchKnowledgeBase(
           query,
@@ -122,34 +134,58 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
           },
         );
 
-        console.log(`[LangChain SearchKnowledge] Search completed. Found ${searchResults.length} results`);
+        console.log(
+          `[LangChain SearchKnowledge] Search completed. Found ${searchResults.length} results`,
+        );
 
         // If no results found
         if (searchResults.length === 0) {
           return JSON.stringify({
             query,
             results: [],
-            message: 'No relevant content found in your knowledge base. Try a different search query.',
+            message:
+              'No relevant content found in your knowledge base. Try a different search query.',
             totalResults: 0,
           });
         }
 
         // Format results for the AI
-        const formattedResults = searchResults.map((result, index) => ({
-          rank: index + 1,
-          content: result.content,
-          similarity: Math.round(result.similarity * 100) / 100,
-          source: {
-            document: result.source.documentTitle,
-            documentId: result.source.documentId,
-            section: `Chunk ${result.source.chunkIndex + 1}`,
-          },
-          relevanceScore: this.getRelevanceLabel(result.similarity),
-        }));
+        const formattedResults = searchResults.map((result, index) => {
+          const baseResult = {
+            rank: index + 1,
+            content: result.content,
+            similarity: Math.round(result.similarity * 100) / 100,
+            source: {
+              document: result.source.documentTitle,
+              documentId: result.source.documentId,
+              section: `Chunk ${result.source.chunkIndex + 1}`,
+            },
+            relevanceScore: this.getRelevanceLabel(result.similarity),
+          };
+
+          // Add EPUB-specific context if available
+          if (
+            result.metadata?.fileType === 'epub' &&
+            result.metadata?.chapterInfo
+          ) {
+            baseResult.source.section = `Chapter: ${result.metadata.chapterInfo.chapterTitle || `Chapter ${result.metadata.chapterInfo.chapterOrder + 1}`}`;
+            baseResult.source.chapterOrder =
+              result.metadata.chapterInfo.chapterOrder;
+            baseResult.source.bookInfo = {
+              author: result.metadata.epubAuthor,
+              publisher: result.metadata.epubPublisher,
+              language: result.metadata.epubLanguage,
+            };
+          }
+
+          return baseResult;
+        });
 
         // Calculate and log token usage
         const tokenStats = getSearchResultTokenStats(formattedResults);
-        console.log(`[LangChain SearchKnowledge] ${formatTokenStats(tokenStats)}`);
+        console.log(
+          `[LangChain SearchKnowledge] ${formatTokenStats(tokenStats)}`,
+        );
 
         // Create a summary for the AI to use
         const summary = this.createSearchSummary(query, formattedResults);
@@ -176,7 +212,8 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
         error: 'Failed to search knowledge base',
         query,
         results: [],
-        message: 'Sorry, there was an error searching your documents. Please try again.',
+        message:
+          'Sorry, there was an error searching your documents. Please try again.',
       });
     }
   }
@@ -203,7 +240,9 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
     const documentTitles = Array.from(
       new Set(results.map((r) => r.source.document)),
     );
-    const highRelevanceCount = results.filter((r) => r.similarity >= 0.8).length;
+    const highRelevanceCount = results.filter(
+      (r) => r.similarity >= 0.8,
+    ).length;
 
     let summary = `Found ${results.length} relevant result${results.length === 1 ? '' : 's'} for "${query}"`;
 
@@ -224,6 +263,8 @@ export class LangChainSearchKnowledgeTool extends StructuredTool {
 /**
  * Factory function to create the LangChain search knowledge tool
  */
-export function createLangChainSearchKnowledgeTool(context: LangChainToolContext): LangChainSearchKnowledgeTool {
+export function createLangChainSearchKnowledgeTool(
+  context: LangChainToolContext,
+): LangChainSearchKnowledgeTool {
   return new LangChainSearchKnowledgeTool(context);
 }

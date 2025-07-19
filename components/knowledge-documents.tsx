@@ -1,13 +1,21 @@
 'use client';
 
 // useEffect no longer needed - SWR handles loading automatically
-import { FileText, Trash2, Download, Calendar, HardDrive, Loader2, RefreshCw } from 'lucide-react';
+import {
+  FileText,
+  Trash2,
+  Download,
+  Calendar,
+  HardDrive,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useKnowledgeDocuments } from '@/hooks/use-knowledge-upload';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -38,12 +46,13 @@ interface KnowledgeDocumentsProps {
   onDocumentSelect?: (document: KnowledgeDocumentDisplay) => void;
 }
 
-export function KnowledgeDocuments({ 
-  className, 
+export function KnowledgeDocuments({
+  className,
   compact = false,
-  onDocumentSelect 
+  onDocumentSelect,
 }: KnowledgeDocumentsProps) {
-  const { documents, isLoading, error, refetch, deleteDocument } = useKnowledgeDocuments();
+  const { documents, isLoading, error, refetch, deleteDocument } =
+    useKnowledgeDocuments();
 
   // No need for manual useEffect - SWR handles initial loading automatically
 
@@ -65,6 +74,8 @@ export function KnowledgeDocuments({
         return 'TXT';
       case 'md':
         return 'MD';
+      case 'epub':
+        return 'EPUB';
       default:
         return 'FILE';
     }
@@ -80,7 +91,9 @@ export function KnowledgeDocuments({
         <div className="flex items-center justify-center space-y-4">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-            <p className="text-sm text-muted-foreground mt-2">Loading documents...</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Loading documents...
+            </p>
           </div>
         </div>
       </Card>
@@ -93,9 +106,9 @@ export function KnowledgeDocuments({
         <div className="text-center text-destructive">
           <p className="font-medium">Failed to load documents</p>
           <p className="text-sm mt-1">{error}</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => refetch()}
             className="mt-3"
           >
@@ -112,7 +125,9 @@ export function KnowledgeDocuments({
         <div className="text-center text-muted-foreground">
           <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="font-medium">No knowledge documents</p>
-          <p className="text-sm mt-1">Upload documents to build your AI knowledge base</p>
+          <p className="text-sm mt-1">
+            Upload documents to build your AI knowledge base
+          </p>
         </div>
       </Card>
     );
@@ -123,9 +138,9 @@ export function KnowledgeDocuments({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Knowledge Documents</h3>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => refetch()}
             title="Refresh documents"
             className="h-8 w-8 p-0"
@@ -147,12 +162,14 @@ export function KnowledgeDocuments({
                 <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
                   <FileText className="h-4 w-4 text-primary" />
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <h4 
+                    <h4
                       className="font-medium truncate cursor-pointer hover:text-primary"
-                      onClick={() => onDocumentSelect?.(document as KnowledgeDocumentDisplay)}
+                      onClick={() =>
+                        onDocumentSelect?.(document as KnowledgeDocumentDisplay)
+                      }
                     >
                       {document.title}
                     </h4>
@@ -162,19 +179,23 @@ export function KnowledgeDocuments({
                       </span>
                     )}
                   </div>
-                  
-                  <p className="text-sm text-muted-foreground mt-1">{document.summary}</p>
+
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {document.summary}
+                  </p>
 
                   <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
                     <div className="flex items-center space-x-1">
                       <HardDrive className="h-3 w-3" />
                       <span>{formatFileSize(document.fileSize)}</span>
                     </div>
-                    
+
                     <div className="flex items-center space-x-1">
                       <Calendar className="h-3 w-3" />
                       <span>
-                        {formatDistanceToNow(new Date(document.createdAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(document.createdAt), {
+                          addSuffix: true,
+                        })}
                       </span>
                     </div>
 
@@ -184,6 +205,31 @@ export function KnowledgeDocuments({
                         <span>{document.metadata.chunkCount} chunks</span>
                       </div>
                     )}
+
+                    {/* EPUB-specific metadata */}
+                    {document.fileType?.toLowerCase() === 'epub' &&
+                      document.metadata?.epubMetadata && (
+                        <>
+                          {document.metadata.epubMetadata.author && (
+                            <div className="flex items-center space-x-1">
+                              <span>
+                                by{' '}
+                                {document.metadata.epubMetadata.author.join(
+                                  ', ',
+                                )}
+                              </span>
+                            </div>
+                          )}
+                          {document.metadata.epubMetadata.totalChapters && (
+                            <div className="flex items-center space-x-1">
+                              <span>
+                                {document.metadata.epubMetadata.totalChapters}{' '}
+                                chapters
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
                   </div>
                 </div>
               </div>
@@ -195,7 +241,10 @@ export function KnowledgeDocuments({
                     size="sm"
                     onClick={() => {
                       // Download original file
-                      window.open(`/api/knowledge/documents/${document.id}?download=true`, '_blank');
+                      window.open(
+                        `/api/knowledge/documents/${document.id}?download=true`,
+                        '_blank',
+                      );
                     }}
                   >
                     <Download className="h-4 w-4" />
@@ -204,7 +253,11 @@ export function KnowledgeDocuments({
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </AlertDialogTrigger>
@@ -212,14 +265,18 @@ export function KnowledgeDocuments({
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Document</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete &quot;{document.title}&quot;? This will remove the document 
-                        and all its processed chunks from your knowledge base. This action cannot be undone.
+                        Are you sure you want to delete &quot;{document.title}
+                        &quot;? This will remove the document and all its
+                        processed chunks from your knowledge base. This action
+                        cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => handleDelete(document as KnowledgeDocumentDisplay)}
+                        onClick={() =>
+                          handleDelete(document as KnowledgeDocumentDisplay)
+                        }
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
                         Delete
@@ -237,9 +294,9 @@ export function KnowledgeDocuments({
 }
 
 // Compact version for sidebars
-export function KnowledgeDocumentsCompact({ 
+export function KnowledgeDocumentsCompact({
   className,
-  onDocumentSelect 
+  onDocumentSelect,
 }: KnowledgeDocumentsProps) {
   const { documents, isLoading, refetch } = useKnowledgeDocuments();
 
@@ -255,6 +312,8 @@ export function KnowledgeDocumentsCompact({
         return 'TXT';
       case 'md':
         return 'MD';
+      case 'epub':
+        return 'EPUB';
       default:
         return 'FILE';
     }
@@ -276,9 +335,9 @@ export function KnowledgeDocumentsCompact({
       <div className={cn('p-2', className)}>
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">No documents</p>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => refetch()}
             title="Refresh documents"
             className="h-6 w-6 p-0"
@@ -295,9 +354,9 @@ export function KnowledgeDocumentsCompact({
     <div className={cn('space-y-1', className)}>
       <div className="flex items-center justify-between px-2 mb-1">
         <span className="text-xs text-muted-foreground">Documents</span>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => refetch()}
           title="Refresh documents"
           className="h-6 w-6 p-0"
@@ -312,7 +371,9 @@ export function KnowledgeDocumentsCompact({
           tabIndex={0}
           key={document.id}
           className="flex items-center space-x-2 p-2 rounded hover:bg-muted cursor-pointer text-sm"
-          onClick={() => onDocumentSelect?.(document as KnowledgeDocumentDisplay)}
+          onClick={() =>
+            onDocumentSelect?.(document as KnowledgeDocumentDisplay)
+          }
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               onDocumentSelect?.(document as KnowledgeDocumentDisplay);
@@ -325,12 +386,14 @@ export function KnowledgeDocumentsCompact({
           <div className="flex-1 min-w-0">
             <p className="truncate font-medium">{document.title}</p>
             <p className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(document.createdAt), { addSuffix: true })}
+              {formatDistanceToNow(new Date(document.createdAt), {
+                addSuffix: true,
+              })}
             </p>
           </div>
         </div>
       ))}
-      
+
       {documents.length > 5 && (
         <div className="p-2 text-center">
           <p className="text-xs text-muted-foreground">
