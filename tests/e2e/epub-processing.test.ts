@@ -220,25 +220,183 @@ test.describe('EPUB Processing', () => {
  * This creates a basic ZIP structure that mimics an EPUB file
  */
 function createTestEpubBuffer(): Buffer {
-  // Create a minimal ZIP buffer with EPUB-like structure
-  // In a real test environment, you would load an actual EPUB file
-  const zipSignature = Buffer.from([0x50, 0x4b, 0x03, 0x04]); // ZIP local file header signature
+  // Create a proper minimal ZIP file structure for testing
+  // This is a simplified but valid ZIP structure
+
   const mimetypeContent = Buffer.from('application/epub+zip');
-  const basicContent = Buffer.from(
-    'This is test EPUB content for testing purposes.',
+  const htmlContent = Buffer.from(
+    '<html><body><h1>Test Chapter</h1><p>This is test EPUB content for testing purposes.</p></body></html>',
   );
 
-  // Create a simple buffer that passes basic validation
-  return Buffer.concat([
-    zipSignature,
-    Buffer.alloc(26), // ZIP header fields
-    Buffer.from('mimetype'), // filename
+  // Create local file headers (using no compression for simplicity)
+  const mimetypeHeader = createZipLocalFileHeader(
+    'mimetype',
     mimetypeContent,
-    zipSignature,
-    Buffer.alloc(26), // ZIP header fields
-    Buffer.from('content.html'), // filename
-    basicContent,
+    0,
+  ); // No compression for mimetype
+  const htmlHeader = createZipLocalFileHeader(
+    'OEBPS/content.html',
+    htmlContent,
+    0,
+  ); // No compression for simplicity
+
+  // Create central directory entries
+  const mimetypeCentralDir = createZipCentralDirEntry(
+    'mimetype',
+    mimetypeContent.length,
+    mimetypeContent.length,
+    0,
+    0,
+  );
+  const htmlCentralDir = createZipCentralDirEntry(
+    'OEBPS/content.html',
+    htmlContent.length,
+    htmlContent.length,
+    0,
+    mimetypeHeader.length,
+  );
+
+  // Create end of central directory record
+  const centralDirOffset = mimetypeHeader.length + htmlHeader.length;
+  const centralDirSize = mimetypeCentralDir.length + htmlCentralDir.length;
+  const endOfCentralDir = createZipEndOfCentralDir(
+    2,
+    centralDirSize,
+    centralDirOffset,
+  );
+
+  // Combine all parts
+  return Buffer.concat([
+    mimetypeHeader,
+    htmlHeader,
+    mimetypeCentralDir,
+    htmlCentralDir,
+    endOfCentralDir,
   ]);
+}
+
+/**
+ * Create a ZIP local file header
+ */
+function createZipLocalFileHeader(
+  filename: string,
+  content: Buffer,
+  compressionMethod: number,
+): Buffer {
+  const filenameBuffer = Buffer.from(filename, 'utf8');
+  const header = Buffer.alloc(30 + filenameBuffer.length);
+
+  // Local file header signature
+  header.writeUInt32LE(0x04034b50, 0);
+  // Version needed to extract
+  header.writeUInt16LE(20, 4);
+  // General purpose bit flag
+  header.writeUInt16LE(0, 6);
+  // Compression method
+  header.writeUInt16LE(compressionMethod, 8);
+  // Last mod file time
+  header.writeUInt16LE(0, 10);
+  // Last mod file date
+  header.writeUInt16LE(0, 12);
+  // CRC-32
+  header.writeUInt32LE(0, 14); // Simplified - should calculate actual CRC
+  // Compressed size
+  header.writeUInt32LE(content.length, 18);
+  // Uncompressed size
+  header.writeUInt32LE(content.length, 22);
+  // File name length
+  header.writeUInt16LE(filenameBuffer.length, 26);
+  // Extra field length
+  header.writeUInt16LE(0, 28);
+
+  // Copy filename
+  filenameBuffer.copy(header, 30);
+
+  return Buffer.concat([header, content]);
+}
+
+/**
+ * Create a ZIP central directory entry
+ */
+function createZipCentralDirEntry(
+  filename: string,
+  compressedSize: number,
+  uncompressedSize: number,
+  compressionMethod: number,
+  localHeaderOffset: number,
+): Buffer {
+  const filenameBuffer = Buffer.from(filename, 'utf8');
+  const entry = Buffer.alloc(46 + filenameBuffer.length);
+
+  // Central directory file header signature
+  entry.writeUInt32LE(0x02014b50, 0);
+  // Version made by
+  entry.writeUInt16LE(20, 4);
+  // Version needed to extract
+  entry.writeUInt16LE(20, 6);
+  // General purpose bit flag
+  entry.writeUInt16LE(0, 8);
+  // Compression method
+  entry.writeUInt16LE(compressionMethod, 10);
+  // Last mod file time
+  entry.writeUInt16LE(0, 12);
+  // Last mod file date
+  entry.writeUInt16LE(0, 14);
+  // CRC-32
+  entry.writeUInt32LE(0, 16); // Simplified
+  // Compressed size
+  entry.writeUInt32LE(compressedSize, 20);
+  // Uncompressed size
+  entry.writeUInt32LE(uncompressedSize, 24);
+  // File name length
+  entry.writeUInt16LE(filenameBuffer.length, 28);
+  // Extra field length
+  entry.writeUInt16LE(0, 30);
+  // File comment length
+  entry.writeUInt16LE(0, 32);
+  // Disk number start
+  entry.writeUInt16LE(0, 34);
+  // Internal file attributes
+  entry.writeUInt16LE(0, 36);
+  // External file attributes
+  entry.writeUInt32LE(0, 38);
+  // Relative offset of local header
+  entry.writeUInt32LE(localHeaderOffset, 42);
+
+  // Copy filename
+  filenameBuffer.copy(entry, 46);
+
+  return entry;
+}
+
+/**
+ * Create ZIP end of central directory record
+ */
+function createZipEndOfCentralDir(
+  numEntries: number,
+  centralDirSize: number,
+  centralDirOffset: number,
+): Buffer {
+  const record = Buffer.alloc(22);
+
+  // End of central dir signature
+  record.writeUInt32LE(0x06054b50, 0);
+  // Number of this disk
+  record.writeUInt16LE(0, 4);
+  // Number of the disk with the start of the central directory
+  record.writeUInt16LE(0, 6);
+  // Total number of entries in the central directory on this disk
+  record.writeUInt16LE(numEntries, 8);
+  // Total number of entries in the central directory
+  record.writeUInt16LE(numEntries, 10);
+  // Size of the central directory
+  record.writeUInt32LE(centralDirSize, 12);
+  // Offset of start of central directory
+  record.writeUInt32LE(centralDirOffset, 16);
+  // ZIP file comment length
+  record.writeUInt16LE(0, 20);
+
+  return record;
 }
 
 /**
