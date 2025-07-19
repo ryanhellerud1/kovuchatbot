@@ -3,56 +3,7 @@
  * Following the same patterns as other RAG component tests
  */
 import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { describe } from 'node:test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { describe } from 'node:test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { describe } from 'node:test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { describe } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { expect } from '@playwright/test';
-import { it } from 'node:test';
-import { describe } from 'node:test';
+import { it, describe } from 'node:test';
 import {
   parseEPUBBuffer,
   parseEPUBWithMetadata,
@@ -224,7 +175,7 @@ export function testEPUBParser() {
       expect(htmlContent).toContain('&nbsp;');
     });
   });
-});
+}
 
 /**
  * Create a minimal EPUB buffer for testing

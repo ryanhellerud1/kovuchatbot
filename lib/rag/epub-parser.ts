@@ -284,8 +284,10 @@ async function extractZipEntry(
           const inflateRawAsync = promisify(inflateRaw);
           return await inflateRawAsync(compressedData);
         } catch (rawInflateError) {
+          const rawError = rawInflateError as Error;
+          const inflateErr = inflateError as Error;
           throw new Error(
-            `Both inflate methods failed: ${inflateError.message} | ${rawInflateError.message}`,
+            `Both inflate methods failed: ${inflateErr.message} | ${rawError.message}`,
           );
         }
       }
@@ -339,12 +341,12 @@ async function extractCorruptedEntry(
 
     // Look for HTML content patterns
     const htmlPatterns = [
-      /<p[^>]*>(.*?)<\/p>/gis,
-      /<div[^>]*>(.*?)<\/div>/gis,
-      /<h[1-6][^>]*>(.*?)<\/h[1-6]>/gis,
-      /<span[^>]*>(.*?)<\/span>/gis,
-      /<td[^>]*>(.*?)<\/td>/gis,
-      /<li[^>]*>(.*?)<\/li>/gis,
+      /<p[^>]*>([\s\S]*?)<\/p>/gi,
+      /<div[^>]*>([\s\S]*?)<\/div>/gi,
+      /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi,
+      /<span[^>]*>([\s\S]*?)<\/span>/gi,
+      /<td[^>]*>([\s\S]*?)<\/td>/gi,
+      /<li[^>]*>([\s\S]*?)<\/li>/gi,
     ];
 
     let extractedText = '';
@@ -394,8 +396,8 @@ function extractTextFromHTML(html: string): string {
   text = text.replace(/<!DOCTYPE[^>]*>/gi, '');
 
   // Remove script and style tags with their content
-  text = text.replace(/<script[^>]*>.*?<\/script>/gis, '');
-  text = text.replace(/<style[^>]*>.*?<\/style>/gis, '');
+  text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
 
   // Convert common HTML entities
   text = text.replace(/&nbsp;/g, ' ');
@@ -458,8 +460,8 @@ function cleanEPUBText(text: string): string {
   let cleanedText = text;
 
   // Step 1: Security - Remove potentially dangerous HTML content
-  cleanedText = cleanedText.replace(/<script[^>]*>.*?<\/script>/gis, ''); // Remove script tags
-  cleanedText = cleanedText.replace(/<style[^>]*>.*?<\/style>/gis, ''); // Remove style tags
+  cleanedText = cleanedText.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''); // Remove script tags
+  cleanedText = cleanedText.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ''); // Remove style tags
   cleanedText = cleanedText.replace(/javascript:/gi, ''); // Remove javascript: URLs
   cleanedText = cleanedText.replace(/on\w+\s*=/gi, ''); // Remove event handlers
 
