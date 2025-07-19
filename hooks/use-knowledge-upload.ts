@@ -63,6 +63,7 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
           '.txt',
           '.md',
           '.markdown',
+          '.epub',
         ];
         const fileExtension = file.name
           .toLowerCase()
@@ -70,7 +71,7 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
 
         if (!supportedExtensions.includes(fileExtension)) {
           throw new Error(
-            'Unsupported file type. Please upload PDF, DOCX, TXT, or Markdown files.',
+            'Unsupported file type. Please upload PDF, DOCX, TXT, Markdown, or EPUB files.',
           );
         }
 
@@ -169,7 +170,7 @@ export function useKnowledgeUpload(): UseKnowledgeUploadReturn {
               errorMessage.includes('unsupported')
             ) {
               throw new Error(
-                `Unsupported file type. Please upload PDF, DOCX, TXT, or Markdown files.`,
+                `Unsupported file type. Please upload PDF, DOCX, TXT, Markdown, or EPUB files.`,
               );
             } else {
               throw new Error(`Upload failed: ${errorMessage}`);

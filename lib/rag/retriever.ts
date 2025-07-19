@@ -3,6 +3,7 @@ import { OpenAIEmbeddings } from '@langchain/openai';
 import { Document } from '@langchain/core/documents';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
+import { parseEPUBBuffer, parseEPUBWithMetadata } from './epub-parser';
 import { createPostgreSQLVectorStore } from './langchain-vector-store';
 import {
   getUserDocumentChunks,
@@ -12,7 +13,11 @@ import {
 } from '@/lib/db/queries';
 import { processDocumentWithLangChain } from './langchain-document-processor';
 import { countTokensMultiple } from '@/lib/utils/token-counter';
-import { sanitizeTextPreserveFormatting, sanitizeMetadata, logSanitizationStats } from '@/lib/utils/text-sanitizer';
+import {
+  sanitizeTextPreserveFormatting,
+  sanitizeMetadata,
+  logSanitizationStats,
+} from '@/lib/utils/text-sanitizer';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -30,8 +35,8 @@ export interface LangChainRAGConfig {
 }
 
 const DEFAULT_CONFIG: LangChainRAGConfig = {
-  chunkSize: 2400,      // Larger chunks for more context per chunk
-  chunkOverlap: 400,    // Significant overlap to maintain context continuity
+  chunkSize: 2400, // Larger chunks for more context per chunk
+  chunkOverlap: 400, // Significant overlap to maintain context continuity
   embeddingModel: 'text-embedding-3-small',
   similarityThreshold: 0.22, // More conservative threshold to improve result quality
 };
@@ -41,18 +46,20 @@ const DEFAULT_CONFIG: LangChainRAGConfig = {
 /**
  * Supported file types for LangChain document processing
  */
-export type SupportedFileType = 'pdf' | 'txt' | 'md' | 'docx';
+export type SupportedFileType = 'pdf' | 'txt' | 'md' | 'docx' | 'epub';
 
 /**
  * Helper function to save multiple document chunks
  */
-async function saveDocumentChunks(chunks: Array<{
-  documentId: string;
-  chunkIndex: number;
-  content: string;
-  embedding: number[];
-  chunkMetadata?: any;
-}>): Promise<void> {
+async function saveDocumentChunks(
+  chunks: Array<{
+    documentId: string;
+    chunkIndex: number;
+    content: string;
+    embedding: number[];
+    chunkMetadata?: any;
+  }>,
+): Promise<void> {
   const chunkPromises = chunks.map(async (chunk) => {
     return saveDocumentChunk({
       documentId: chunk.documentId,
@@ -96,10 +103,16 @@ export interface ProcessedDocument {
 /**
  * Create a temporary file from buffer for LangChain loaders
  */
-async function createTempFile(buffer: Buffer, fileName: string): Promise<string> {
+async function createTempFile(
+  buffer: Buffer,
+  fileName: string,
+): Promise<string> {
   const tempDir = os.tmpdir();
-  const tempFilePath = path.join(tempDir, `langchain_${Date.now()}_${fileName}`);
-  
+  const tempFilePath = path.join(
+    tempDir,
+    `langchain_${Date.now()}_${fileName}`,
+  );
+
   await fs.promises.writeFile(tempFilePath, buffer);
   return tempFilePath;
 }
@@ -124,7 +137,7 @@ export async function loadDocumentWithLangChain(
   fileType: SupportedFileType,
 ): Promise<Document[]> {
   let tempFilePath: string | null = null;
-  
+
   try {
     // For text files, we can process directly
     if (fileType === 'txt' || fileType === 'md') {
@@ -132,57 +145,95 @@ export async function loadDocumentWithLangChain(
       if (!content || content.trim().length === 0) {
         throw new Error('No text content found in file');
       }
-      
+
       // Sanitize text content
       const sanitizedContent = sanitizeTextPreserveFormatting(content);
       if (content !== sanitizedContent) {
         logSanitizationStats(content, sanitizedContent, `${fileType} file`);
       }
-      
-      return [new Document({
-        pageContent: sanitizedContent,
-        metadata: sanitizeMetadata({ fileName, fileType, fileSize: file.length })
-      })];
+
+      return [
+        new Document({
+          pageContent: sanitizedContent,
+          metadata: sanitizeMetadata({
+            fileName,
+            fileType,
+            fileSize: file.length,
+          }),
+        }),
+      ];
     }
 
     // For binary files, create temporary file for LangChain loaders
     tempFilePath = await createTempFile(file, fileName);
-    
-    let loader: PDFLoader | DocxLoader;
-    
+
+    let loader: PDFLoader | DocxLoader | null = null;
+    let documents: Document[] = [];
+
     switch (fileType) {
       case 'pdf':
         loader = new PDFLoader(tempFilePath, {
           splitPages: false, // We'll handle chunking separately
         });
         break;
-        
+
       case 'docx':
         loader = new DocxLoader(tempFilePath);
         break;
-        
+
+      case 'epub': {
+        // Handle EPUB files using our custom parser with metadata
+        console.log(`[LangChain] Loading EPUB document with custom parser`);
+        const epubResult = await parseEPUBWithMetadata(file, fileName);
+
+        // Create a Document object similar to other loaders
+        const epubDocument: Document = {
+          pageContent: epubResult.content,
+          metadata: {
+            source: tempFilePath,
+            fileName,
+            fileType: 'epub',
+            epubMetadata: epubResult.metadata,
+            totalChapters: epubResult.chapters.length,
+            chapterTitles: epubResult.chapters.map((ch) => ch.title),
+          },
+        };
+
+        documents = [epubDocument];
+        break;
+      }
+
       default:
         throw new Error(`Unsupported file type for LangChain: ${fileType}`);
     }
-    
-    console.log(`[LangChain] Loading document with ${loader.constructor.name}`);
-    const documents = await loader.load();
-    
-    if (!documents || documents.length === 0) {
-      throw new Error('No content loaded from document');
+
+    // Load documents only if we have a loader (not for EPUB which is handled above)
+    if (loader) {
+      console.log(
+        `[LangChain] Loading document with ${loader.constructor.name}`,
+      );
+      documents = await loader.load();
+
+      if (!documents || documents.length === 0) {
+        throw new Error('No content loaded from document');
+      }
     }
-    
+
     // Sanitize and add file metadata to documents
     documents.forEach((doc, index) => {
       // Sanitize document content
       const originalContent = doc.pageContent;
       doc.pageContent = sanitizeTextPreserveFormatting(originalContent);
-      
+
       // Log sanitization if changes were made
       if (originalContent !== doc.pageContent) {
-        logSanitizationStats(originalContent, doc.pageContent, `document ${index + 1}`);
+        logSanitizationStats(
+          originalContent,
+          doc.pageContent,
+          `document ${index + 1}`,
+        );
       }
-      
+
       // Sanitize and add metadata
       doc.metadata = sanitizeMetadata({
         ...doc.metadata,
@@ -193,10 +244,11 @@ export async function loadDocumentWithLangChain(
         documentIndex: index,
       });
     });
-    
-    console.log(`[LangChain] Loaded ${documents.length} document(s) from ${fileName}`);
+
+    console.log(
+      `[LangChain] Loaded ${documents.length} document(s) from ${fileName}`,
+    );
     return documents;
-    
   } finally {
     // Cleanup temporary file
     if (tempFilePath) {
@@ -212,27 +264,37 @@ export async function processDocument(
   file: Buffer,
   fileName: string,
   fileType: SupportedFileType,
-  config: LangChainRAGConfig = DEFAULT_CONFIG
+  config: LangChainRAGConfig = DEFAULT_CONFIG,
 ): Promise<ProcessedDocument> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
   try {
     console.log(`[LangChain] Processing document: ${fileName}`);
-    
+
     // Load document using LangChain loaders
-    const loadedDocuments = await loadDocumentWithLangChain(file, fileName, fileType);
-    
+    const loadedDocuments = await loadDocumentWithLangChain(
+      file,
+      fileName,
+      fileType,
+    );
+
     // Combine all document content
-    const fullContent = loadedDocuments.map(doc => doc.pageContent).join('\n\n');
-    
+    const fullContent = loadedDocuments
+      .map((doc) => doc.pageContent)
+      .join('\n\n');
+
     if (!fullContent || fullContent.trim().length === 0) {
       throw new Error('No text content found in document');
     }
-    
+
     // Sanitize the full content
     const sanitizedFullContent = sanitizeTextPreserveFormatting(fullContent);
     if (fullContent !== sanitizedFullContent) {
-      logSanitizationStats(fullContent, sanitizedFullContent, 'combined document content');
+      logSanitizationStats(
+        fullContent,
+        sanitizedFullContent,
+        'combined document content',
+      );
     }
 
     // Split text using LangChain's text splitter with improved chunking strategy
@@ -241,29 +303,34 @@ export async function processDocument(
       chunkOverlap: finalConfig.chunkOverlap,
       // Use more natural text boundaries for chunking
       separators: [
-        "\n## ", // Markdown headers
-        "\n### ",
-        "\n#### ",
-        "\n\n", // Paragraphs
-        "\n", // Lines
-        ". ", // Sentences
-        "! ",
-        "? ",
-        "; ",
-        ":", // Clauses
-        ", ", // Phrases
-        " ", // Words
-        "" // Characters
+        '\n## ', // Markdown headers
+        '\n### ',
+        '\n#### ',
+        '\n\n', // Paragraphs
+        '\n', // Lines
+        '. ', // Sentences
+        '! ',
+        '? ',
+        '; ',
+        ':', // Clauses
+        ', ', // Phrases
+        ' ', // Words
+        '', // Characters
       ],
       // Keep semantically meaningful chunks
       keepSeparator: true,
     });
 
-    const documents = await textSplitter.createDocuments([fullContent], [{ 
-      title: fileName.replace(/\.[^/.]+$/, ''),
-      fileName,
-      fileType 
-    }]);
+    const documents = await textSplitter.createDocuments(
+      [fullContent],
+      [
+        {
+          title: fileName.replace(/\.[^/.]+$/, ''),
+          fileName,
+          fileType,
+        },
+      ],
+    );
 
     console.log(`[LangChain] Split into ${documents.length} chunks`);
 
@@ -272,7 +339,7 @@ export async function processDocument(
       modelName: finalConfig.embeddingModel,
     });
 
-    const texts = documents.map(doc => doc.pageContent);
+    const texts = documents.map((doc) => doc.pageContent);
     const embeddingVectors = await embeddings.embedDocuments(texts);
 
     console.log(`[LangChain] Generated ${embeddingVectors.length} embeddings`);
@@ -317,16 +384,19 @@ export async function processDocument(
 function generateSummary(content: string, maxLength = 150): string {
   // Remove excessive whitespace and newlines
   const cleanedContent = content.replace(/\s+/g, ' ').trim();
-  
+
   // Truncate to maxLength
   if (cleanedContent.length <= maxLength) {
     return cleanedContent;
   }
-  
+
   // Find the last space within the maxLength to avoid cutting words
   const lastSpace = cleanedContent.lastIndexOf(' ', maxLength);
-  const summary = cleanedContent.substring(0, lastSpace > 0 ? lastSpace : maxLength);
-  
+  const summary = cleanedContent.substring(
+    0,
+    lastSpace > 0 ? lastSpace : maxLength,
+  );
+
   return `${summary}...`;
 }
 
@@ -364,11 +434,15 @@ export interface SearchOptions {
 function preprocessQuery(query: string): string {
   // Remove extra whitespace
   let processedQuery = query.trim().replace(/\s+/g, ' ');
-  
+
   // Remove common filler words that don't add semantic meaning
-  const fillerWords = /\b(a|an|and|or|but|is|are|was|were|be|been|being|in|on|at|to|for|with|by|about|like|through|over|before|after|since|during)\b/gi;
-  processedQuery = processedQuery.replace(fillerWords, ' ').replace(/\s+/g, ' ').trim();
-  
+  const fillerWords =
+    /\b(a|an|and|or|but|is|are|was|were|be|been|being|in|on|at|to|for|with|by|about|like|through|over|before|after|since|during)\b/gi;
+  processedQuery = processedQuery
+    .replace(fillerWords, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   return processedQuery;
 }
 
@@ -381,13 +455,18 @@ function generateQueryVariations(query: string): string[] {
 
   // Add variations without question words
   if (/^(what|how|why|when|where|who|which)\b/i.test(query)) {
-    variations.push(query.replace(/^(what|how|why|when|where|who|which)\s+/i, ''));
+    variations.push(
+      query.replace(/^(what|how|why|when|where|who|which)\s+/i, ''),
+    );
   }
 
   // For longer queries, add a version with just the key terms
   if (words.length > 2) {
     const keywords = extractKeywords(query);
-    if (keywords.length > 1 && keywords.join(' ').toLowerCase() !== query.toLowerCase()) {
+    if (
+      keywords.length > 1 &&
+      keywords.join(' ').toLowerCase() !== query.toLowerCase()
+    ) {
       variations.push(keywords.join(' '));
     }
   }
@@ -398,32 +477,38 @@ function generateQueryVariations(query: string): string[] {
 export async function searchKnowledgeBase(
   query: string,
   userId: string,
-  options: SearchOptions = {}
+  options: SearchOptions = {},
 ): Promise<SearchResult[]> {
   const { limit = 25, minSimilarity = 0.22, includeMetadata = true } = options;
 
   try {
-    console.log(`[LangChain] Starting search for user ${userId} with query: "${query}"`);
-    
+    console.log(
+      `[LangChain] Starting search for user ${userId} with query: "${query}"`,
+    );
+
     // Preprocess the query
     const processedQuery = preprocessQuery(query);
     console.log(`[LangChain] Processed query: "${processedQuery}"`);
-    
+
     // Generate query variations for better recall
     const queryVariations = generateQueryVariations(processedQuery);
     if (queryVariations.length > 1) {
-      console.log(`[LangChain] Generated ${queryVariations.length} query variations`);
+      console.log(
+        `[LangChain] Generated ${queryVariations.length} query variations`,
+      );
     }
-    
+
     const embeddings = new OpenAIEmbeddings({
       modelName: 'text-embedding-3-small',
     });
 
     const vectorStore = await createPostgreSQLVectorStore(userId, embeddings);
-    
+
     // Test the vector store connection
-    console.log(`[LangChain] Vector store created successfully for user ${userId}`);
-    
+    console.log(
+      `[LangChain] Vector store created successfully for user ${userId}`,
+    );
+
     const uniqueResults: Array<[Document, number]> = [];
     const seenContents = new Set<string>();
 
@@ -431,13 +516,20 @@ export async function searchKnowledgeBase(
     for (const q of queryVariations) {
       // Stop if we have enough results to satisfy the limit after filtering
       if (uniqueResults.length >= limit) {
-        console.log('[LangChain] Sufficient results gathered, stopping further searches.');
+        console.log(
+          '[LangChain] Sufficient results gathered, stopping further searches.',
+        );
         break;
       }
-      
+
       console.log(`[LangChain] Searching with query variation: "${q}"`);
-      const variationResults = await vectorStore.similaritySearchWithScore(q, limit * 2);
-      console.log(`[LangChain] Retrieved ${variationResults.length} results for variation`);
+      const variationResults = await vectorStore.similaritySearchWithScore(
+        q,
+        limit * 2,
+      );
+      console.log(
+        `[LangChain] Retrieved ${variationResults.length} results for variation`,
+      );
 
       for (const result of variationResults) {
         const contentHash = result[0].pageContent.substring(0, 100);
@@ -447,8 +539,10 @@ export async function searchKnowledgeBase(
         }
       }
     }
-    
-    console.log(`[LangChain] Gathered ${uniqueResults.length} unique results from all query variations.`);
+
+    console.log(
+      `[LangChain] Gathered ${uniqueResults.length} unique results from all query variations.`,
+    );
 
     // Filter by similarity threshold and format results
     const filteredResults = uniqueResults
@@ -467,28 +561,42 @@ export async function searchKnowledgeBase(
         metadata: includeMetadata ? document.metadata : undefined,
       }));
 
-    console.log(`[LangChain] Found ${filteredResults.length} results above similarity threshold ${minSimilarity}`);
-    
+    console.log(
+      `[LangChain] Found ${filteredResults.length} results above similarity threshold ${minSimilarity}`,
+    );
+
     if (filteredResults.length > 0) {
-      const similarities = filteredResults.map(r => r.similarity);
-      console.log(`[LangChain] Similarity range: ${Math.min(...similarities).toFixed(3)} - ${Math.max(...similarities).toFixed(3)}`);
+      const similarities = filteredResults.map((r) => r.similarity);
+      console.log(
+        `[LangChain] Similarity range: ${Math.min(...similarities).toFixed(3)} - ${Math.max(...similarities).toFixed(3)}`,
+      );
     }
-    
+
     // Implement keyword boosting for exact matches
     const boostedResults = boostExactMatches(query, filteredResults);
-    
+
     // Add document diversity to ensure results from multiple documents when possible
-    const diversifiedResults = diversifyResultsByDocument(boostedResults, limit);
-    
+    const diversifiedResults = diversifyResultsByDocument(
+      boostedResults,
+      limit,
+    );
+
     // For highly relevant results, try to include adjacent chunks for more context
-    const enhancedResults = await enhanceWithAdjacentChunks(diversifiedResults, userId);
+    const enhancedResults = await enhanceWithAdjacentChunks(
+      diversifiedResults,
+      userId,
+    );
 
     // Log token usage for the final enhanced results
     if (enhancedResults.length > 0) {
-      const resultContents = enhancedResults.map(r => r.content);
+      const resultContents = enhancedResults.map((r) => r.content);
       const totalTokens = countTokensMultiple(resultContents);
-      const avgTokensPerResult = Math.round(totalTokens / enhancedResults.length);
-      console.log(`[LangChain] Enhanced results token usage: ${totalTokens} tokens (avg: ${avgTokensPerResult}/result) for ${enhancedResults.length} results`);
+      const avgTokensPerResult = Math.round(
+        totalTokens / enhancedResults.length,
+      );
+      console.log(
+        `[LangChain] Enhanced results token usage: ${totalTokens} tokens (avg: ${avgTokensPerResult}/result) for ${enhancedResults.length} results`,
+      );
     }
 
     return enhancedResults;
@@ -501,28 +609,33 @@ export async function searchKnowledgeBase(
 /**
  * Boost results that contain exact keyword matches
  */
-function boostExactMatches(query: string, results: SearchResult[]): SearchResult[] {
+function boostExactMatches(
+  query: string,
+  results: SearchResult[],
+): SearchResult[] {
   if (!results.length) return results;
-  
+
   // Extract important keywords from the query
   const keywords = extractKeywords(query);
   if (!keywords.length) return results;
-  
-  console.log(`[LangChain] Boosting results for keywords: ${keywords.join(', ')}`);
-  
+
+  console.log(
+    `[LangChain] Boosting results for keywords: ${keywords.join(', ')}`,
+  );
+
   // Clone results to avoid modifying the original
   const boostedResults = [...results];
-  
+
   // Calculate boost for each result
   for (const result of boostedResults) {
     let keywordBoost = 0;
     const content = result.content.toLowerCase();
-    
+
     // Check for exact keyword matches
     for (const keyword of keywords) {
       // Skip very short keywords
       if (keyword.length < 2) continue;
-      
+
       const regex = new RegExp(`\\b${keyword}\\b`, 'i');
       if (regex.test(content)) {
         // Boost based on keyword length and position
@@ -531,7 +644,7 @@ function boostExactMatches(query: string, results: SearchResult[]): SearchResult
         keywordBoost += Math.min(0.1, keyword.length * 0.01) + positionFactor;
       }
     }
-    
+
     // Apply boost (max 0.2 to avoid overwhelming semantic similarity)
     if (keywordBoost > 0) {
       const cappedBoost = Math.min(0.2, keywordBoost);
@@ -539,22 +652,25 @@ function boostExactMatches(query: string, results: SearchResult[]): SearchResult
       result.keywordBoost = cappedBoost;
     }
   }
-  
+
   // Re-sort based on boosted similarity
   boostedResults.sort((a, b) => b.similarity - a.similarity);
-  
+
   return boostedResults;
 }
 
 /**
  * Diversify results to include content from multiple documents when possible
  */
-function diversifyResultsByDocument(results: SearchResult[], targetLimit: number): SearchResult[] {
+function diversifyResultsByDocument(
+  results: SearchResult[],
+  targetLimit: number,
+): SearchResult[] {
   if (results.length <= targetLimit) return results;
-  
+
   // Group results by document
   const resultsByDocument = new Map<string, SearchResult[]>();
-  
+
   for (const result of results) {
     const docId = result.source.documentId;
     if (!resultsByDocument.has(docId)) {
@@ -562,35 +678,40 @@ function diversifyResultsByDocument(results: SearchResult[], targetLimit: number
     }
     resultsByDocument.get(docId)?.push(result);
   }
-  
+
   // If we only have one document, return top results
   if (resultsByDocument.size === 1) {
     return results.slice(0, targetLimit);
   }
-  
-  console.log(`[diversifyResultsByDocument] Found results from ${resultsByDocument.size} documents`);
-  
+
+  console.log(
+    `[diversifyResultsByDocument] Found results from ${resultsByDocument.size} documents`,
+  );
+
   // Distribute results across documents
   const diversifiedResults: SearchResult[] = [];
-  const maxPerDocument = Math.max(1, Math.ceil(targetLimit / resultsByDocument.size));
-  
+  const maxPerDocument = Math.max(
+    1,
+    Math.ceil(targetLimit / resultsByDocument.size),
+  );
+
   // First pass: take top results from each document
   for (const [docId, docResults] of resultsByDocument) {
     const topFromDoc = docResults.slice(0, maxPerDocument);
     diversifiedResults.push(...topFromDoc);
   }
-  
+
   // Second pass: fill remaining slots with highest similarity results
   const remainingSlots = targetLimit - diversifiedResults.length;
   if (remainingSlots > 0) {
-    const usedIds = new Set(diversifiedResults.map(r => r.id));
+    const usedIds = new Set(diversifiedResults.map((r) => r.id));
     const remainingResults = results
-      .filter(r => !usedIds.has(r.id))
+      .filter((r) => !usedIds.has(r.id))
       .slice(0, remainingSlots);
-    
+
     diversifiedResults.push(...remainingResults);
   }
-  
+
   // Sort by similarity and return
   return diversifiedResults
     .sort((a, b) => b.similarity - a.similarity)
@@ -603,33 +724,99 @@ function diversifyResultsByDocument(results: SearchResult[], targetLimit: number
 function extractKeywords(query: string): string[] {
   // Remove quotes and special characters
   const cleanQuery = query.replace(/["']/g, '').replace(/[^\w\s]/g, ' ');
-  
+
   // Split into words
   const words = cleanQuery.toLowerCase().split(/\s+/);
-  
+
   // Filter out common words and short words
   const stopWords = new Set([
-    'the', 'a', 'an', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about', 'like', 'through', 'over', 'before',
-    'after', 'since', 'during', 'this', 'that', 'these', 'those', 'they', 'them', 'their',
-    'what', 'which', 'who', 'whom', 'whose', 'when', 'where', 'why', 'how', 'all', 'any',
-    'both', 'each', 'few', 'more', 'most', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
-    'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now', 'between'
+    'the',
+    'a',
+    'an',
+    'and',
+    'or',
+    'but',
+    'is',
+    'are',
+    'was',
+    'were',
+    'be',
+    'been',
+    'being',
+    'in',
+    'on',
+    'at',
+    'to',
+    'for',
+    'with',
+    'by',
+    'about',
+    'like',
+    'through',
+    'over',
+    'before',
+    'after',
+    'since',
+    'during',
+    'this',
+    'that',
+    'these',
+    'those',
+    'they',
+    'them',
+    'their',
+    'what',
+    'which',
+    'who',
+    'whom',
+    'whose',
+    'when',
+    'where',
+    'why',
+    'how',
+    'all',
+    'any',
+    'both',
+    'each',
+    'few',
+    'more',
+    'most',
+    'some',
+    'such',
+    'no',
+    'nor',
+    'not',
+    'only',
+    'own',
+    'same',
+    'so',
+    'than',
+    'too',
+    'very',
+    'can',
+    'will',
+    'just',
+    'should',
+    'now',
+    'between',
   ]);
-  
-  return words.filter(word => 
-    word.length > 1 && !stopWords.has(word)
-  );
+
+  return words.filter((word) => word.length > 1 && !stopWords.has(word));
 }
 
 /**
  * Enhance highly relevant results by including adjacent chunks for more context
  */
-async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string): Promise<SearchResult[]> {
+async function enhanceWithAdjacentChunks(
+  results: SearchResult[],
+  userId: string,
+): Promise<SearchResult[]> {
   if (!results.length) return results;
 
   const contextThreshold = 0.45;
-  const resultsForContext = results.filter(r => r.similarity >= contextThreshold);
+  const resultsForContext = results.filter(
+    (r) => r.similarity >= contextThreshold,
+  );
 
   // If no results meet the threshold, return original results
   if (resultsForContext.length === 0) {
@@ -637,13 +824,16 @@ async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string
   }
 
   // Prepare list of chunks for which we need context
-  const chunksToGetContextFor = resultsForContext.map(r => ({
+  const chunksToGetContextFor = resultsForContext.map((r) => ({
     documentId: r.source.documentId,
     chunkIndex: r.source.chunkIndex,
   }));
 
   // Fetch all necessary adjacent chunks in a single, efficient query
-  const allAdjacentChunks = await getAdjacentChunksForDocuments(userId, chunksToGetContextFor);
+  const allAdjacentChunks = await getAdjacentChunksForDocuments(
+    userId,
+    chunksToGetContextFor,
+  );
 
   const enhancedResults: SearchResult[] = [...results];
 
@@ -653,12 +843,15 @@ async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string
         result.source.documentId,
         result.source.chunkIndex,
         allAdjacentChunks, // Use the pre-fetched, targeted list of chunks
-        2
+        2,
       );
 
       for (const chunk of adjacentChunks) {
         const distance = Math.abs(chunk.chunkIndex - result.source.chunkIndex);
-        const contextualSimilarity = Math.max(0.15, result.similarity - (0.1 * distance));
+        const contextualSimilarity = Math.max(
+          0.15,
+          result.similarity - 0.1 * distance,
+        );
 
         enhancedResults.push({
           id: `${result.id}_adjacent_${chunk.chunkIndex}`,
@@ -678,7 +871,10 @@ async function enhanceWithAdjacentChunks(results: SearchResult[], userId: string
         });
       }
     } catch (error) {
-      console.warn(`[enhanceWithAdjacentChunks] Failed to get adjacent chunks for ${result.id}:`, error);
+      console.warn(
+        `[enhanceWithAdjacentChunks] Failed to get adjacent chunks for ${result.id}:`,
+        error,
+      );
     }
   }
 
@@ -694,19 +890,23 @@ function getAdjacentChunks(
   documentId: string,
   chunkIndex: number,
   allChunks: Array<{ documentId: string; chunkIndex: number; content: string }>,
-  range = 1
+  range = 1,
 ): Array<{ content: string; chunkIndex: number }> {
   const documentChunks = allChunks
-    .filter(chunk => chunk.documentId === documentId)
+    .filter((chunk) => chunk.documentId === documentId)
     .sort((a, b) => a.chunkIndex - b.chunkIndex);
 
   const adjacentChunks: Array<{ content: string; chunkIndex: number }> = [];
 
   for (let i = 1; i <= range; i++) {
-    const prevChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex - i);
+    const prevChunk = documentChunks.find(
+      (chunk) => chunk.chunkIndex === chunkIndex - i,
+    );
     if (prevChunk) adjacentChunks.push(prevChunk);
 
-    const nextChunk = documentChunks.find(chunk => chunk.chunkIndex === chunkIndex + i);
+    const nextChunk = documentChunks.find(
+      (chunk) => chunk.chunkIndex === chunkIndex + i,
+    );
     if (nextChunk) adjacentChunks.push(nextChunk);
   }
 
@@ -723,12 +923,17 @@ export async function saveDocumentWithLangChain(
   fileType: string,
   fileSize: number,
   fileUrl?: string,
-  config: LangChainRAGConfig = DEFAULT_CONFIG
+  config: LangChainRAGConfig = DEFAULT_CONFIG,
 ): Promise<string> {
   // Process document with LangChain - convert content to buffer
   const contentBuffer = Buffer.from(content, 'utf-8');
   const fileName = `${title}.txt`; // Default to txt for string content
-  const { documents, embeddings } = await processDocumentWithLangChain(contentBuffer, fileName, 'txt', config);
+  const { documents, embeddings } = await processDocumentWithLangChain(
+    contentBuffer,
+    fileName,
+    'txt',
+    config,
+  );
 
   // Save knowledge document
   const knowledgeDoc = await saveKnowledgeDocument({
@@ -765,7 +970,9 @@ export async function saveDocumentWithLangChain(
 /**
  * Factory function to create LangChain embeddings
  */
-export function createLangChainEmbeddings(modelName = 'text-embedding-3-small'): OpenAIEmbeddings {
+export function createLangChainEmbeddings(
+  modelName = 'text-embedding-3-small',
+): OpenAIEmbeddings {
   return new OpenAIEmbeddings({
     modelName,
     openAIApiKey: process.env.OPENAI_API_KEY,
@@ -788,6 +995,8 @@ export function getFileType(fileName: string): SupportedFileType | null {
       return 'md';
     case 'docx':
       return 'docx';
+    case 'epub':
+      return 'epub';
     default:
       return null;
   }
@@ -821,24 +1030,32 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     const embeddings = new OpenAIEmbeddings({
       modelName: 'text-embedding-3-small',
     });
-    
+
     const embedding = await embeddings.embedQuery(text);
     return embedding;
   } catch (error) {
     console.error('Error generating embedding:', error);
-    
+
     // Provide more specific error messages
     if (error instanceof Error) {
       if (error.message.includes('API key')) {
-        throw new Error('OpenAI API key is missing or invalid. Please check your OPENAI_API_KEY environment variable.');
+        throw new Error(
+          'OpenAI API key is missing or invalid. Please check your OPENAI_API_KEY environment variable.',
+        );
       } else if (error.message.includes('quota')) {
-        throw new Error('OpenAI API quota exceeded. Please check your OpenAI account usage.');
+        throw new Error(
+          'OpenAI API quota exceeded. Please check your OpenAI account usage.',
+        );
       } else if (error.message.includes('rate limit')) {
-        throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+        throw new Error(
+          'OpenAI API rate limit exceeded. Please try again later.',
+        );
       }
     }
-    
-    throw new Error('Failed to generate embedding. Please check your OpenAI API configuration.');
+
+    throw new Error(
+      'Failed to generate embedding. Please check your OpenAI API configuration.',
+    );
   }
 }
 
@@ -850,45 +1067,57 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
     const embeddings = new OpenAIEmbeddings({
       modelName: 'text-embedding-3-small',
     });
-    
+
     const embeddingVectors = await embeddings.embedDocuments(texts);
     return embeddingVectors;
   } catch (error) {
     console.error('Error generating embeddings:', error);
-    
+
     // Provide more specific error messages
     if (error instanceof Error) {
       if (error.message.includes('API key')) {
-        throw new Error('OpenAI API key is missing or invalid. Please check your OPENAI_API_KEY environment variable.');
+        throw new Error(
+          'OpenAI API key is missing or invalid. Please check your OPENAI_API_KEY environment variable.',
+        );
       } else if (error.message.includes('quota')) {
-        throw new Error('OpenAI API quota exceeded. Please check your OpenAI account usage.');
+        throw new Error(
+          'OpenAI API quota exceeded. Please check your OpenAI account usage.',
+        );
       } else if (error.message.includes('rate limit')) {
-        throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+        throw new Error(
+          'OpenAI API rate limit exceeded. Please try again later.',
+        );
       }
     }
-    
-    throw new Error('Failed to generate embeddings. Please check your OpenAI API configuration.');
+
+    throw new Error(
+      'Failed to generate embeddings. Please check your OpenAI API configuration.',
+    );
   }
 }
 
 /**
  * Simple text chunking function for testing purposes
  */
-export function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
+export function chunkText(
+  text: string,
+  chunkSize = 1000,
+  overlap = 200,
+): string[] {
   const chunks: string[] = [];
   let start = 0;
-  
+
   while (start < text.length) {
     const end = Math.min(start + chunkSize, text.length);
     chunks.push(text.slice(start, end));
     start = end - overlap;
-    
+
     // Avoid infinite loop if overlap is too large
     if (start >= end) {
       break;
     }
   }
-  
+
   return chunks;
 }
 
