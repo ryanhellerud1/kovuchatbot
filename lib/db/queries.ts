@@ -844,6 +844,21 @@ export async function refreshOptimizationData() {
 }
 
 /**
+ * Refresh optimization data for a single document
+ */
+export async function refreshOptimizationDataForDocument(documentId: string) {
+  try {
+    const refreshQuery = sql`SELECT refresh_optimization_data_for_document(${documentId}::UUID)`;
+    await db.execute(refreshQuery);
+    console.log(`[refreshOptimizationDataForDocument] Successfully refreshed optimization data for document ${documentId}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to refresh optimization data for document ${documentId}:`, error);
+    return false;
+  }
+}
+
+/**
  * Get search performance summary for a user
  */
 export async function getSearchPerformanceSummary(userId: string, days = 7) {

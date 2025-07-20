@@ -6,11 +6,22 @@ import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { parseEPUBBuffer, parseEPUBWithMetadata } from './epub-parser';
 import { createPostgreSQLVectorStore } from './langchain-vector-store';
 import {
-  getUserDocumentChunks,
+  documentChunks,
+  knowledgeDocuments,
+  type DocumentChunk,
+} from '@/lib/db/schema';
+import {
+  deleteKnowledgeDocument,
   getAdjacentChunksForDocuments,
-  saveKnowledgeDocument,
+  getDocumentChunks,
+  getUserDocumentChunks,
+  refreshOptimizationData,
+  refreshOptimizationDataForDocument,
   saveDocumentChunk,
-} from '@/lib/db/queries';
+  saveKnowledgeDocument,
+} from '../db/queries';
+import { embedTexts } from '../ai/embedding';
+import { getFileProcessor } from './langchain-document-processor';
 import { processDocumentWithLangChain } from './langchain-document-processor';
 import { countTokensMultiple } from '@/lib/utils/token-counter';
 import {
@@ -963,6 +974,19 @@ export async function saveDocumentWithLangChain(
   }));
 
   await saveDocumentChunks(chunks);
+
+  // Refresh optimization data for the new document
+  try {
+    await refreshOptimizationDataForDocument(knowledgeDoc.id);
+    console.log(
+      `[saveDocumentWithLangChain] Successfully refreshed optimization data for document ${knowledgeDoc.id}.`,
+    );
+  } catch (error) {
+    console.error(
+      `[saveDocumentWithLangChain] Failed to refresh optimization data for document ${knowledgeDoc.id}:`,
+      error,
+    );
+  }
 
   return knowledgeDoc.id;
 }
