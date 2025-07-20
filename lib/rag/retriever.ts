@@ -20,9 +20,11 @@ import {
   saveDocumentChunk,
   saveKnowledgeDocument,
 } from '../db/queries';
-import { embedTexts } from '../ai/embedding';
-import { getFileProcessor } from './langchain-document-processor';
-import { processDocumentWithLangChain } from './langchain-document-processor';
+import { embedTexts } from '../ai/langchain-chat';
+import {
+  getFileProcessor,
+  processDocumentWithLangChain,
+} from './langchain-document-processor';
 import { countTokensMultiple } from '@/lib/utils/token-counter';
 import {
   sanitizeTextPreserveFormatting,
