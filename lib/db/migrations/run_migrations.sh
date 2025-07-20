@@ -191,6 +191,7 @@ main() {
         "001_add_performance_indexes.sql"
         "002_optimized_similarity_search.sql"
         "003_query_optimization_helpers.sql"
+        "004_targeted_optimization.sql"
     )
     
     for migration in "${migrations[@]}"; do
@@ -199,3 +200,6 @@ main() {
     
     # Verify migrations
     verify_migrations
+}
+
+main "$@"
