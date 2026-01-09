@@ -35,9 +35,12 @@ importers:
       '@codemirror/view':
         specifier: ^6.35.3
         version: 6.36.4
+      '@huggingface/inference':
+        specifier: ^4.13.5
+        version: 4.13.5
       '@langchain/community':
         specifier: ^0.3.14
-        version: 0.3.47(@browserbasehq/sdk@2.6.0)(@browserbasehq/stagehand@1.14.0(@playwright/test@1.51.0)(bufferutil@4.0.9)(deepmerge@4.3.1)(dotenv@16.4.7)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(zod@3.24.2))(@ibm-cloud/watsonx-ai@1.6.8)(@langchain/core@0.3.61(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2)))(@neondatabase/serverless@0.9.5)(@vercel/postgres@0.10.0)(axios@1.10.0)(epub2@3.0.2(ts-toolbelt@9.6.0))(ibm-cloud-sdk-core@5.4.0)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(mammoth@1.9.1)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(pdf-parse@1.1.1)(playwright@1.51.0)(weaviate-client@3.6.2)(ws@8.18.1(bufferutil@4.0.9))
+        version: 0.3.47(@browserbasehq/sdk@2.6.0)(@browserbasehq/stagehand@1.14.0(@playwright/test@1.51.0)(bufferutil@4.0.9)(deepmerge@4.3.1)(dotenv@16.4.7)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(zod@3.24.2))(@huggingface/inference@4.13.5)(@ibm-cloud/watsonx-ai@1.6.8)(@langchain/core@0.3.61(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2)))(@neondatabase/serverless@0.9.5)(@vercel/postgres@0.10.0)(axios@1.10.0)(epub2@3.0.2(ts-toolbelt@9.6.0))(ibm-cloud-sdk-core@5.4.0)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(mammoth@1.9.1)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(pdf-parse@1.1.1)(playwright@1.51.0)(weaviate-client@3.6.2)(ws@8.18.1(bufferutil@4.0.9))
       '@langchain/core':
         specifier: ^0.3.15
         version: 0.3.61(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))
@@ -991,6 +994,17 @@ packages:
     resolution: {integrity: sha512-tMXdRCfYVixjuFK+Hk0Q1s38gV9zDiDJfWL3h1rv4Qc39oILCu1TRTDt7+fGUI8K4G1Fj125Hx/ru3azECWTyQ==}
     engines: {node: '>=6'}
     hasBin: true
+
+  '@huggingface/inference@4.13.5':
+    resolution: {integrity: sha512-jeRQVwoV2Xx5stHR4wyZPPvhOOm6Hi9B2hsHWWuFJBEoxlFJMbRAsQbTvQrusw2vNBfNHIqb2i9EpelNLOqhvg==}
+    engines: {node: '>=18'}
+
+  '@huggingface/jinja@0.5.3':
+    resolution: {integrity: sha512-asqfZ4GQS0hD876Uw4qiUb7Tr/V5Q+JZuo2L+BtdrD4U40QU58nIRq3ZSgAzJgT874VLjhGVacaYfrdpXtEvtA==}
+    engines: {node: '>=18'}
+
+  '@huggingface/tasks@0.19.75':
+    resolution: {integrity: sha512-yTz6Hs3KcalPhlzMAUtjEGO0W21e5s661LGm2U0vEJRn/sanLTgP2QWL0lL/IvrAh+Ybiz7iNIcYtJcVOuCndg==}
 
   '@humanwhocodes/config-array@0.13.0':
     resolution: {integrity: sha512-DZLEEqFWQFiyK6h5YIeynKx7JlvCYWL0cImfSRXZ9l4Sg2efkFGTuFf6vzXjK1cq6IYkU+Eg/JizXw+TD2vRNw==}
@@ -5798,6 +5812,15 @@ snapshots:
       protobufjs: 7.5.3
       yargs: 17.7.2
 
+  '@huggingface/inference@4.13.5':
+    dependencies:
+      '@huggingface/jinja': 0.5.3
+      '@huggingface/tasks': 0.19.75
+
+  '@huggingface/jinja@0.5.3': {}
+
+  '@huggingface/tasks@0.19.75': {}
+
   '@humanwhocodes/config-array@0.13.0':
     dependencies:
       '@humanwhocodes/object-schema': 2.0.3
@@ -5948,7 +5971,7 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
-  '@langchain/community@0.3.47(@browserbasehq/sdk@2.6.0)(@browserbasehq/stagehand@1.14.0(@playwright/test@1.51.0)(bufferutil@4.0.9)(deepmerge@4.3.1)(dotenv@16.4.7)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(zod@3.24.2))(@ibm-cloud/watsonx-ai@1.6.8)(@langchain/core@0.3.61(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2)))(@neondatabase/serverless@0.9.5)(@vercel/postgres@0.10.0)(axios@1.10.0)(epub2@3.0.2(ts-toolbelt@9.6.0))(ibm-cloud-sdk-core@5.4.0)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(mammoth@1.9.1)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(pdf-parse@1.1.1)(playwright@1.51.0)(weaviate-client@3.6.2)(ws@8.18.1(bufferutil@4.0.9))':
+  '@langchain/community@0.3.47(@browserbasehq/sdk@2.6.0)(@browserbasehq/stagehand@1.14.0(@playwright/test@1.51.0)(bufferutil@4.0.9)(deepmerge@4.3.1)(dotenv@16.4.7)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(zod@3.24.2))(@huggingface/inference@4.13.5)(@ibm-cloud/watsonx-ai@1.6.8)(@langchain/core@0.3.61(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2)))(@neondatabase/serverless@0.9.5)(@vercel/postgres@0.10.0)(axios@1.10.0)(epub2@3.0.2(ts-toolbelt@9.6.0))(ibm-cloud-sdk-core@5.4.0)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(mammoth@1.9.1)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(pdf-parse@1.1.1)(playwright@1.51.0)(weaviate-client@3.6.2)(ws@8.18.1(bufferutil@4.0.9))':
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.51.0)(bufferutil@4.0.9)(deepmerge@4.3.1)(dotenv@16.4.7)(openai@4.104.0(ws@8.18.1(bufferutil@4.0.9))(zod@3.24.2))(zod@3.24.2)
       '@ibm-cloud/watsonx-ai': 1.6.8
@@ -5967,6 +5990,7 @@ snapshots:
       zod: 3.25.67
     optionalDependencies:
       '@browserbasehq/sdk': 2.6.0
+      '@huggingface/inference': 4.13.5
       '@neondatabase/serverless': 0.9.5
       '@vercel/postgres': 0.10.0
       epub2: 3.0.2(ts-toolbelt@9.6.0)
@@ -8260,7 +8284,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.7.1
+      semver: 7.7.3
 
   jsx-ast-utils@3.3.5:
     dependencies:
@@ -9538,8 +9562,7 @@ snapshots:
 
   semver@7.7.1: {}
 
-  semver@7.7.3:
-    optional: true
+  semver@7.7.3: {}
 
   serialize-javascript@6.0.2:
     dependencies:
