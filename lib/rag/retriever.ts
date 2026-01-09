@@ -3,17 +3,16 @@ import { Embeddings } from '@langchain/core/embeddings';
 import { Document } from '@langchain/core/documents';
 
 /**
- * Direct HuggingFace API embeddings (bypasses @huggingface/inference ESM issues)
+ * Google Gemini embeddings - free and reliable
  * Pads to 1536 dimensions for database compatibility
  */
-class PaddedHuggingFaceEmbeddings extends Embeddings {
+class GoogleEmbeddings extends Embeddings {
   private apiKey: string;
-  private model = 'BAAI/bge-base-en-v1.5';
   private targetDimension = 1536;
 
   constructor() {
     super({});
-    this.apiKey = process.env.HUGGING_FACE_API_TOKEN || '';
+    this.apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
   }
 
   private padEmbedding(embedding: number[]): number[] {
@@ -27,38 +26,41 @@ class PaddedHuggingFaceEmbeddings extends Embeddings {
     return padded;
   }
 
-  private async callHuggingFaceAPI(texts: string[]): Promise<number[][]> {
-    const response = await fetch(
-      `https://router.huggingface.co/hf-inference/pipeline/feature-extraction/${this.model}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: texts,
-          options: { wait_for_model: true },
-        }),
-      }
-    );
+  private async callGoogleAPI(texts: string[]): Promise<number[][]> {
+    const results: number[][] = [];
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`HuggingFace API error: ${response.status} - ${error}`);
+    for (const text of texts) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'models/text-embedding-004',
+            content: { parts: [{ text }] },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Google API error: ${response.status} - ${error}`);
+      }
+
+      const data = await response.json();
+      results.push(data.embedding.values);
     }
 
-    const embeddings = await response.json();
-    return embeddings as number[][];
+    return results;
   }
 
   async embedDocuments(texts: string[]): Promise<number[][]> {
-    const embeddings = await this.callHuggingFaceAPI(texts);
+    const embeddings = await this.callGoogleAPI(texts);
     return embeddings.map(emb => this.padEmbedding(emb));
   }
 
   async embedQuery(text: string): Promise<number[]> {
-    const embeddings = await this.callHuggingFaceAPI([text]);
+    const embeddings = await this.callGoogleAPI([text]);
     return this.padEmbedding(embeddings[0]);
   }
 }
@@ -409,7 +411,7 @@ export async function processDocument(
     console.log(`[LangChain] Split into ${documents.length} chunks`);
 
     // Generate embeddings
-    const embeddings = new PaddedHuggingFaceEmbeddings();
+    const embeddings = new GoogleEmbeddings();
 
     const texts = documents.map((doc) => doc.pageContent);
     const embeddingVectors = await embeddings.embedDocuments(texts);
@@ -570,7 +572,7 @@ export async function searchKnowledgeBase(
       );
     }
 
-    const embeddings = new PaddedHuggingFaceEmbeddings();
+    const embeddings = new GoogleEmbeddings();
 
     const vectorStore = await createPostgreSQLVectorStore(userId, embeddings);
 
@@ -1055,7 +1057,7 @@ export async function saveDocumentWithLangChain(
  * Now uses HuggingFace embeddings (free) with padding for DB compatibility
  */
 export function createLangChainEmbeddings(): Embeddings {
-  return new PaddedHuggingFaceEmbeddings();
+  return new GoogleEmbeddings();
 }
 
 /**
@@ -1106,7 +1108,7 @@ export function shouldUseBlobStorage(fileSize: number): boolean {
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const embeddings = new PaddedHuggingFaceEmbeddings();
+    const embeddings = new GoogleEmbeddings();
 
     const embedding = await embeddings.embedQuery(text);
     return embedding;
@@ -1141,7 +1143,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   try {
-    const embeddings = new PaddedHuggingFaceEmbeddings();
+    const embeddings = new GoogleEmbeddings();
 
     const embeddingVectors = await embeddings.embedDocuments(texts);
     return embeddingVectors;
