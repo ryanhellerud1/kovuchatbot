@@ -1,5 +1,4 @@
 import { customProvider } from 'ai';
-import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { isTestEnvironment } from '../constants';
@@ -31,8 +30,9 @@ const openrouter = createOpenRouter({
   },
 });
 
-// Define the model identifier constants
-const QWEN3_MODEL_NAME = 'qwen/qwen3-32b:free';
+// Free models on OpenRouter - rotate if one is rate limited
+const CHAT_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+const ARTIFACT_MODEL = 'qwen/qwen3-32b:free';
 
 export const myProvider = isTestEnvironment
   ? customProvider({
@@ -51,11 +51,11 @@ export const myProvider = isTestEnvironment
     })
   : customProvider({
       languageModels: {
-        // Use Google directly - free tier with generous limits, no OpenRouter rate limits
-        'chat-model-tools': google('gemini-2.0-flash'),
+        // Llama 3.3 70B - excellent free model with tool support
+        'chat-model-tools': openrouter(CHAT_MODEL),
         // Artifact models for document generation
-        'artifact-model-qwen3': openrouter(QWEN3_MODEL_NAME),
-        'artifact-model': openrouter(QWEN3_MODEL_NAME),
+        'artifact-model-qwen3': openrouter(ARTIFACT_MODEL),
+        'artifact-model': openrouter(ARTIFACT_MODEL),
       },
       imageModels: {
         'small-model': {
