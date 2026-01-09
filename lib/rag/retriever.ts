@@ -29,7 +29,7 @@ class PaddedHuggingFaceEmbeddings extends Embeddings {
 
   private async callHuggingFaceAPI(texts: string[]): Promise<number[][]> {
     const response = await fetch(
-      `https://api-inference.huggingface.co/pipeline/feature-extraction/${this.model}`,
+      `https://router.huggingface.co/hf-inference/pipeline/feature-extraction/${this.model}`,
       {
         method: 'POST',
         headers: {
