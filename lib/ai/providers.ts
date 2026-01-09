@@ -1,4 +1,5 @@
 import { customProvider } from 'ai';
+import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { isTestEnvironment } from '../constants';
@@ -32,21 +33,14 @@ const openrouter = createOpenRouter({
 
 // Define the model identifier constants
 const QWEN3_MODEL_NAME = 'qwen/qwen3-32b:free';
-// Use OpenRouter's free Gemini - more reliable than direct Google API
-const TOOLS_MODEL_NAME = 'google/gemini-2.0-flash-exp:free';
 
 export const myProvider = isTestEnvironment
   ? customProvider({
       languageModels: {
-        // 'chat-model-reasoning-qwen3': wrapLanguageModel({
-        //   model: reasoningModel,
-        //   middleware: extractReasoningMiddleware({ tagName: 'think' }),
-        // }),
-        'chat-model': chatModel, // Add for test compatibility
+        'chat-model': chatModel,
         'chat-model-tools': chatModel,
-        // Artifact models for document generation
-        'artifact-model-qwen3': artifactModel, // Use mock artifact model for tests
-        'artifact-model': artifactModel, // Use mock artifact model for tests
+        'artifact-model-qwen3': artifactModel,
+        'artifact-model': artifactModel,
       },
       imageModels: {
         'small-model': {
@@ -57,16 +51,11 @@ export const myProvider = isTestEnvironment
     })
   : customProvider({
       languageModels: {
-        // Qwen3 reasoning model (Kovu AI Deep Think) - no tools
-        // 'chat-model-reasoning-qwen3': wrapLanguageModel({
-        //   model: openrouter(QWEN3_MODEL_NAME),
-        //   middleware: extractReasoningMiddleware({ tagName: 'think' }),
-        // }),
-        // Gemini via OpenRouter (free tier, more reliable)
-        'chat-model-tools': openrouter(TOOLS_MODEL_NAME),
+        // Use Google directly - free tier with generous limits, no OpenRouter rate limits
+        'chat-model-tools': google('gemini-2.0-flash'),
         // Artifact models for document generation
-        'artifact-model-qwen3': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts
-        'artifact-model': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts (free)
+        'artifact-model-qwen3': openrouter(QWEN3_MODEL_NAME),
+        'artifact-model': openrouter(QWEN3_MODEL_NAME),
       },
       imageModels: {
         'small-model': {
