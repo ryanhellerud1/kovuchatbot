@@ -37,7 +37,7 @@ const openrouter = createOpenRouter({
 
 // Define the model identifier constants
 const QWEN3_MODEL_NAME = 'qwen/qwen3-32b:free';
-const TOOLS_MODEL_NAME = 'models/gemini-2.5-flash-lite-preview-06-17';
+const TOOLS_MODEL_NAME = 'gemini-2.0-flash'; // Stable, free Google model
 
 export const myProvider = isTestEnvironment
   ? customProvider({
@@ -80,7 +80,7 @@ export const myProvider = isTestEnvironment
         })(),
         // Artifact models for document generation
         'artifact-model-qwen3': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts
-        'artifact-model': openai(TOOLS_MODEL_NAME), // Fallback to OpenAI for sheets
+        'artifact-model': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts (free)
       },
       imageModels: {
         'small-model': {
