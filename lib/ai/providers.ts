@@ -1,13 +1,8 @@
-import { google } from '@ai-sdk/google';
-import {
-  customProvider,
-  extractReasoningMiddleware,
-  wrapLanguageModel,
-} from 'ai';
+import { customProvider } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { isTestEnvironment } from '../constants';
-import { artifactModel, chatModel, reasoningModel } from './models.test';
+import { artifactModel, chatModel } from './models.test';
 
 // Define the OpenRouter instance using the official provider
 const openrouter = createOpenRouter({
@@ -37,7 +32,8 @@ const openrouter = createOpenRouter({
 
 // Define the model identifier constants
 const QWEN3_MODEL_NAME = 'qwen/qwen3-32b:free';
-const TOOLS_MODEL_NAME = 'gemini-2.0-flash'; // Stable, free Google model
+// Use OpenRouter's free Gemini - more reliable than direct Google API
+const TOOLS_MODEL_NAME = 'google/gemini-2.0-flash-exp:free';
 
 export const myProvider = isTestEnvironment
   ? customProvider({
@@ -66,18 +62,8 @@ export const myProvider = isTestEnvironment
         //   model: openrouter(QWEN3_MODEL_NAME),
         //   middleware: extractReasoningMiddleware({ tagName: 'think' }),
         // }),
-        // Google Gemini model with tool support and error handling
-        'chat-model-tools': (() => {
-          try {
-            return google(TOOLS_MODEL_NAME);
-          } catch (error: unknown) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            console.error('Failed to initialize Gemini model:', message);
-            // Fallback to stable model
-            return google('models/gemini-1.5-flash');
-          }
-        })(),
+        // Gemini via OpenRouter (free tier, more reliable)
+        'chat-model-tools': openrouter(TOOLS_MODEL_NAME),
         // Artifact models for document generation
         'artifact-model-qwen3': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts
         'artifact-model': openrouter(QWEN3_MODEL_NAME), // Use Qwen3 for artifacts (free)
