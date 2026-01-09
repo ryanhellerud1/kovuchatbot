@@ -30,9 +30,9 @@ const openrouter = createOpenRouter({
   },
 });
 
-// Free models on OpenRouter - rotate if one is rate limited
-const CHAT_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
-const ARTIFACT_MODEL = 'qwen/qwen3-32b:free';
+// Paid models on OpenRouter (uses your credits, no rate limits)
+const CHAT_MODEL = 'google/gemini-2.0-flash-001';  // Fast, cheap ($0.10/1M tokens)
+const ARTIFACT_MODEL = 'google/gemini-2.0-flash-001';
 
 export const myProvider = isTestEnvironment
   ? customProvider({
