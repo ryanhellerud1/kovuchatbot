@@ -1,29 +1,25 @@
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { HuggingFaceInferenceEmbeddings } from '@langchain/community/embeddings/hf';
 import { Embeddings } from '@langchain/core/embeddings';
 import { Document } from '@langchain/core/documents';
 
 /**
- * Wrapper class that pads HuggingFace embeddings to 1536 dimensions
- * for compatibility with existing database schema (OpenAI's dimension)
+ * Direct HuggingFace API embeddings (bypasses @huggingface/inference ESM issues)
+ * Pads to 1536 dimensions for database compatibility
  */
 class PaddedHuggingFaceEmbeddings extends Embeddings {
-  private hfEmbeddings: HuggingFaceInferenceEmbeddings;
+  private apiKey: string;
+  private model = 'BAAI/bge-base-en-v1.5';
   private targetDimension = 1536;
 
   constructor() {
     super({});
-    this.hfEmbeddings = new HuggingFaceInferenceEmbeddings({
-      apiKey: process.env.HUGGING_FACE_API_TOKEN,
-      model: 'BAAI/bge-base-en-v1.5', // 768 dimensions, good quality
-    });
+    this.apiKey = process.env.HUGGING_FACE_API_TOKEN || '';
   }
 
   private padEmbedding(embedding: number[]): number[] {
     if (embedding.length >= this.targetDimension) {
       return embedding.slice(0, this.targetDimension);
     }
-    // Pad with zeros to reach target dimension
     const padded = new Array(this.targetDimension).fill(0);
     for (let i = 0; i < embedding.length; i++) {
       padded[i] = embedding[i];
@@ -31,14 +27,39 @@ class PaddedHuggingFaceEmbeddings extends Embeddings {
     return padded;
   }
 
+  private async callHuggingFaceAPI(texts: string[]): Promise<number[][]> {
+    const response = await fetch(
+      `https://api-inference.huggingface.co/pipeline/feature-extraction/${this.model}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: texts,
+          options: { wait_for_model: true },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`HuggingFace API error: ${response.status} - ${error}`);
+    }
+
+    const embeddings = await response.json();
+    return embeddings as number[][];
+  }
+
   async embedDocuments(texts: string[]): Promise<number[][]> {
-    const embeddings = await this.hfEmbeddings.embedDocuments(texts);
+    const embeddings = await this.callHuggingFaceAPI(texts);
     return embeddings.map(emb => this.padEmbedding(emb));
   }
 
   async embedQuery(text: string): Promise<number[]> {
-    const embedding = await this.hfEmbeddings.embedQuery(text);
-    return this.padEmbedding(embedding);
+    const embeddings = await this.callHuggingFaceAPI([text]);
+    return this.padEmbedding(embeddings[0]);
   }
 }
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
