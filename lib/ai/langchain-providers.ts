@@ -1,6 +1,45 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { HuggingFaceInferenceEmbeddings } from '@langchain/community/embeddings/hf';
+import { Embeddings } from '@langchain/core/embeddings';
 import { isTestEnvironment } from '../constants';
+
+/**
+ * Wrapper class that pads HuggingFace embeddings to 1536 dimensions
+ * for compatibility with existing database schema (OpenAI's dimension)
+ */
+class PaddedHuggingFaceEmbeddings extends Embeddings {
+  private hfEmbeddings: HuggingFaceInferenceEmbeddings;
+  private targetDimension = 1536;
+
+  constructor() {
+    super({});
+    this.hfEmbeddings = new HuggingFaceInferenceEmbeddings({
+      apiKey: process.env.HUGGING_FACE_API_TOKEN,
+      model: 'BAAI/bge-base-en-v1.5', // 768 dimensions, good quality
+    });
+  }
+
+  private padEmbedding(embedding: number[]): number[] {
+    if (embedding.length >= this.targetDimension) {
+      return embedding.slice(0, this.targetDimension);
+    }
+    const padded = new Array(this.targetDimension).fill(0);
+    for (let i = 0; i < embedding.length; i++) {
+      padded[i] = embedding[i];
+    }
+    return padded;
+  }
+
+  async embedDocuments(texts: string[]): Promise<number[][]> {
+    const embeddings = await this.hfEmbeddings.embedDocuments(texts);
+    return embeddings.map(emb => this.padEmbedding(emb));
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    const embedding = await this.hfEmbeddings.embedQuery(text);
+    return this.padEmbedding(embedding);
+  }
+}
 
 /**
  * LangChain model configuration
@@ -73,20 +112,16 @@ export function createLangChainChatModel(config: LangChainModelConfig): ChatOpen
 }
 
 /**
- * Create a LangChain OpenAI embeddings instance
+ * Create a LangChain embeddings instance (using free HuggingFace)
  */
-export function createLangChainEmbeddings(): OpenAIEmbeddings {
-  const apiKey = process.env.OPENAI_API_KEY;
-  
+export function createLangChainEmbeddings(): Embeddings {
+  const apiKey = process.env.HUGGING_FACE_API_TOKEN;
+
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is required for LangChain embeddings');
+    throw new Error('HUGGING_FACE_API_TOKEN environment variable is required for embeddings');
   }
 
-  return new OpenAIEmbeddings({
-    modelName: 'text-embedding-3-small',
-    openAIApiKey: apiKey,
-    dimensions: 1536, // Match current implementation
-  });
+  return new PaddedHuggingFaceEmbeddings();
 }
 
 /**

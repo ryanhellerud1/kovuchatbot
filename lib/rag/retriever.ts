@@ -1,6 +1,46 @@
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { HuggingFaceInferenceEmbeddings } from '@langchain/community/embeddings/hf';
+import { Embeddings } from '@langchain/core/embeddings';
 import { Document } from '@langchain/core/documents';
+
+/**
+ * Wrapper class that pads HuggingFace embeddings to 1536 dimensions
+ * for compatibility with existing database schema (OpenAI's dimension)
+ */
+class PaddedHuggingFaceEmbeddings extends Embeddings {
+  private hfEmbeddings: HuggingFaceInferenceEmbeddings;
+  private targetDimension = 1536;
+
+  constructor() {
+    super({});
+    this.hfEmbeddings = new HuggingFaceInferenceEmbeddings({
+      apiKey: process.env.HUGGING_FACE_API_TOKEN,
+      model: 'BAAI/bge-base-en-v1.5', // 768 dimensions, good quality
+    });
+  }
+
+  private padEmbedding(embedding: number[]): number[] {
+    if (embedding.length >= this.targetDimension) {
+      return embedding.slice(0, this.targetDimension);
+    }
+    // Pad with zeros to reach target dimension
+    const padded = new Array(this.targetDimension).fill(0);
+    for (let i = 0; i < embedding.length; i++) {
+      padded[i] = embedding[i];
+    }
+    return padded;
+  }
+
+  async embedDocuments(texts: string[]): Promise<number[][]> {
+    const embeddings = await this.hfEmbeddings.embedDocuments(texts);
+    return embeddings.map(emb => this.padEmbedding(emb));
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    const embedding = await this.hfEmbeddings.embedQuery(text);
+    return this.padEmbedding(embedding);
+  }
+}
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { parseEPUBBuffer, parseEPUBWithMetadata } from './epub-parser';
@@ -348,9 +388,7 @@ export async function processDocument(
     console.log(`[LangChain] Split into ${documents.length} chunks`);
 
     // Generate embeddings
-    const embeddings = new OpenAIEmbeddings({
-      modelName: finalConfig.embeddingModel,
-    });
+    const embeddings = new PaddedHuggingFaceEmbeddings();
 
     const texts = documents.map((doc) => doc.pageContent);
     const embeddingVectors = await embeddings.embedDocuments(texts);
@@ -511,9 +549,7 @@ export async function searchKnowledgeBase(
       );
     }
 
-    const embeddings = new OpenAIEmbeddings({
-      modelName: 'text-embedding-3-small',
-    });
+    const embeddings = new PaddedHuggingFaceEmbeddings();
 
     const vectorStore = await createPostgreSQLVectorStore(userId, embeddings);
 
@@ -995,14 +1031,10 @@ export async function saveDocumentWithLangChain(
 
 /**
  * Factory function to create LangChain embeddings
+ * Now uses HuggingFace embeddings (free) with padding for DB compatibility
  */
-export function createLangChainEmbeddings(
-  modelName = 'text-embedding-3-small',
-): OpenAIEmbeddings {
-  return new OpenAIEmbeddings({
-    modelName,
-    openAIApiKey: process.env.OPENAI_API_KEY,
-  });
+export function createLangChainEmbeddings(): Embeddings {
+  return new PaddedHuggingFaceEmbeddings();
 }
 
 /**
@@ -1053,9 +1085,7 @@ export function shouldUseBlobStorage(fileSize: number): boolean {
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const embeddings = new OpenAIEmbeddings({
-      modelName: 'text-embedding-3-small',
-    });
+    const embeddings = new PaddedHuggingFaceEmbeddings();
 
     const embedding = await embeddings.embedQuery(text);
     return embedding;
@@ -1090,9 +1120,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   try {
-    const embeddings = new OpenAIEmbeddings({
-      modelName: 'text-embedding-3-small',
-    });
+    const embeddings = new PaddedHuggingFaceEmbeddings();
 
     const embeddingVectors = await embeddings.embedDocuments(texts);
     return embeddingVectors;
