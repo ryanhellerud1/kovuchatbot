@@ -12,10 +12,15 @@ import {
   type SetStateAction,
   type ChangeEvent,
   memo,
+  // useState, // Already implicitly imported via other hooks if used, but good to be explicit if needed
+  // useEffect, // Already imported
+  // useCallback, // Already imported
+  // useRef, // Already imported
 } from 'react';
 import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 
+import { ProactiveSuggestions } from './proactive-suggestions'; // Added import
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
@@ -53,6 +58,70 @@ function PureMultimodalInput({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
+  const [proactiveSuggestionsList, setProactiveSuggestionsList] = useState<string[]>([]);
+  const [showProactiveSuggestions, setShowProactiveSuggestions] = useState<boolean>(false);
+  const hesitationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchProactiveSuggestions = useCallback(async () => {
+    if (input.trim() === '') {
+      setShowProactiveSuggestions(false);
+      return;
+    }
+
+    const minimalChatHistory = messages
+      .map(msg => ({
+        role: msg.role,
+        // Ensure content is string; adjust if your UIMessage content can be complex
+        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+      }))
+      .slice(-10); // Send last 10 messages
+
+    try {
+      const response = await fetch('/api/chat/proactive-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partialQuery: input, chatHistory: minimalChatHistory }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.suggestions && data.suggestions.length > 0) {
+          setProactiveSuggestionsList(data.suggestions);
+          setShowProactiveSuggestions(true);
+        } else {
+          setShowProactiveSuggestions(false);
+        }
+      } else {
+        console.error('Failed to fetch proactive suggestions:', response.statusText);
+        setShowProactiveSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Error fetching proactive suggestions:', error);
+      setShowProactiveSuggestions(false);
+    }
+  }, [input, messages]);
+
+  useEffect(() => {
+    if (hesitationTimerRef.current) {
+      clearTimeout(hesitationTimerRef.current);
+    }
+
+    if (input.trim() === '') {
+      setShowProactiveSuggestions(false);
+      setProactiveSuggestionsList([]); // Clear suggestions when input is empty
+      return;
+    }
+
+    hesitationTimerRef.current = setTimeout(() => {
+      fetchProactiveSuggestions();
+    }, 2500); // 2.5 seconds delay
+
+    return () => {
+      if (hesitationTimerRef.current) {
+        clearTimeout(hesitationTimerRef.current);
+      }
+    };
+  }, [input, fetchProactiveSuggestions]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -218,6 +287,12 @@ function PureMultimodalInput({
 
   return (
     <div className="relative w-full flex flex-col gap-4">
+      <ProactiveSuggestions
+        suggestions={proactiveSuggestionsList}
+        append={append}
+        isVisible={showProactiveSuggestions}
+        onDismiss={() => setShowProactiveSuggestions(false)}
+      />
       {messages.length === 0 &&
         attachments.length === 0 &&
         uploadQueue.length === 0 && (
@@ -310,6 +385,12 @@ export const MultimodalInput = memo(
     if (prevProps.input !== nextProps.input) return false;
     if (prevProps.status !== nextProps.status) return false;
     if (!equal(prevProps.attachments, nextProps.attachments)) return false;
+    // Add checks for new props/state if they affect rendering and are not covered by other checks
+    // For this change, existing checks should be mostly fine as new state primarily controls a conditionally rendered component.
+    // However, if `messages` prop changes, it might affect `fetchProactiveSuggestions` and thus `proactiveSuggestionsList`.
+    // `input` is already checked.
+    if (!equal(prevProps.messages, nextProps.messages)) return false;
+
 
     return true;
   },
