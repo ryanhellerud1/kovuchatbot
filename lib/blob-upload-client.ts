@@ -112,7 +112,10 @@ export async function processKnowledgeDocumentFromBlob(
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to process document');
+      const errorMsg = errorData.details
+        ? `${errorData.error}: ${errorData.details}`
+        : errorData.error || 'Failed to process document';
+      throw new Error(errorMsg);
     }
 
     return await response.json();

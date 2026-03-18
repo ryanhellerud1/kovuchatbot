@@ -28,17 +28,22 @@ class GoogleEmbeddings extends Embeddings {
 
   private async callGoogleAPI(texts: string[]): Promise<number[][]> {
     const results: number[][] = [];
+    const batchSize = 100; // Google API supports up to 100 per batch
 
-    for (const text of texts) {
+    for (let i = 0; i < texts.length; i += batchSize) {
+      const batch = texts.slice(i, i + batchSize);
+
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${this.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${this.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'models/gemini-embedding-001',
-            content: { parts: [{ text }] },
-            outputDimensionality: this.targetDimension,
+            requests: batch.map(text => ({
+              model: 'models/gemini-embedding-001',
+              content: { parts: [{ text }] },
+              outputDimensionality: this.targetDimension,
+            })),
           }),
         }
       );
@@ -49,7 +54,9 @@ class GoogleEmbeddings extends Embeddings {
       }
 
       const data = await response.json();
-      results.push(data.embedding.values);
+      for (const embedding of data.embeddings) {
+        results.push(embedding.values);
+      }
     }
 
     return results;
