@@ -48,16 +48,16 @@ export async function POST(request: Request): Promise<NextResponse<ProcessBlobRe
     );
   }
 
-  // Check environment variables
-  if (!process.env.OPENAI_API_KEY) {
-    console.error('[Process Blob] OPENAI_API_KEY is not set');
+  // Check environment variables - embeddings use Google API
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    console.error('[Process Blob] GOOGLE_GENERATIVE_AI_API_KEY is not set');
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'OpenAI API key not configured',
-        details: 'The server is missing the required OpenAI API key configuration'
+      {
+        success: false,
+        error: 'Google AI API key not configured',
+        details: 'The server is missing the required GOOGLE_GENERATIVE_AI_API_KEY for generating embeddings'
       },
-      { 
+      {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       }
@@ -216,14 +216,14 @@ export async function POST(request: Request): Promise<NextResponse<ProcessBlobRe
         );
       }
 
-      if (error.message.includes('OpenAI')) {
+      if (error.message.includes('Google API error') || error.message.includes('OpenAI')) {
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             error: 'Failed to generate embeddings',
-            details: 'There was an issue with the AI processing service'
+            details: error.message
           },
-          { 
+          {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
           }

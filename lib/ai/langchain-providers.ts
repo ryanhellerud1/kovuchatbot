@@ -31,13 +31,14 @@ class GoogleEmbeddings extends Embeddings {
 
     for (const text of texts) {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${this.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${this.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'models/text-embedding-004',
+            model: 'models/gemini-embedding-001',
             content: { parts: [{ text }] },
+            outputDimensionality: this.targetDimension,
           }),
         }
       );
