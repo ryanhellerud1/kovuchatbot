@@ -3,35 +3,49 @@ import { Embeddings } from '@langchain/core/embeddings';
 import { Document } from '@langchain/core/documents';
 
 /**
- * Voyage AI embeddings using voyage-code-2
- * Outputs 1536 dimensions natively - matches database schema exactly
- * Free tier: 50M tokens
+ * Jina AI embeddings using jina-embeddings-v3
+ * 1024 dimensions padded to 1536 for database compatibility
+ * Free tier: 1M tokens, 100 RPM, no credit card required
  */
-class VoyageEmbeddings extends Embeddings {
+class JinaEmbeddings extends Embeddings {
   private apiKey: string;
+  private targetDimension = 1536;
+  private nativeDimension = 1024;
 
   constructor() {
     super({});
-    this.apiKey = process.env.VOYAGE_API_KEY || '';
+    this.apiKey = process.env.JINA_API_KEY || '';
   }
 
-  private async callVoyageAPI(texts: string[], inputType: 'document' | 'query'): Promise<number[][]> {
-    const response = await fetch('https://api.voyageai.com/v1/embeddings', {
+  private padEmbedding(embedding: number[]): number[] {
+    if (embedding.length >= this.targetDimension) {
+      return embedding.slice(0, this.targetDimension);
+    }
+    const padded = new Array(this.targetDimension).fill(0);
+    for (let i = 0; i < embedding.length; i++) {
+      padded[i] = embedding[i];
+    }
+    return padded;
+  }
+
+  private async callJinaAPI(texts: string[], task: 'retrieval.passage' | 'retrieval.query'): Promise<number[][]> {
+    const response = await fetch('https://api.jina.ai/v1/embeddings', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
-        model: 'voyage-code-2',
+        model: 'jina-embeddings-v3',
         input: texts,
-        input_type: inputType,
+        dimensions: this.nativeDimension,
+        task,
       }),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Voyage AI embedding error: ${response.status} - ${error}`);
+      throw new Error(`Jina embedding error: ${response.status} - ${error}`);
     }
 
     const data = await response.json();
@@ -42,20 +56,20 @@ class VoyageEmbeddings extends Embeddings {
 
   async embedDocuments(texts: string[]): Promise<number[][]> {
     const results: number[][] = [];
-    const batchSize = 128; // Voyage supports up to 128 texts per batch
+    const batchSize = 100;
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize);
-      const embeddings = await this.callVoyageAPI(batch, 'document');
-      results.push(...embeddings);
+      const embeddings = await this.callJinaAPI(batch, 'retrieval.passage');
+      results.push(...embeddings.map(emb => this.padEmbedding(emb)));
     }
 
     return results;
   }
 
   async embedQuery(text: string): Promise<number[]> {
-    const embeddings = await this.callVoyageAPI([text], 'query');
-    return embeddings[0];
+    const embeddings = await this.callJinaAPI([text], 'retrieval.query');
+    return this.padEmbedding(embeddings[0]);
   }
 }
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
@@ -405,7 +419,7 @@ export async function processDocument(
     console.log(`[LangChain] Split into ${documents.length} chunks`);
 
     // Generate embeddings
-    const embeddings = new VoyageEmbeddings();
+    const embeddings = new JinaEmbeddings();
 
     const texts = documents.map((doc) => doc.pageContent);
     const embeddingVectors = await embeddings.embedDocuments(texts);
@@ -566,7 +580,7 @@ export async function searchKnowledgeBase(
       );
     }
 
-    const embeddings = new VoyageEmbeddings();
+    const embeddings = new JinaEmbeddings();
 
     const vectorStore = await createPostgreSQLVectorStore(userId, embeddings);
 
@@ -1051,7 +1065,7 @@ export async function saveDocumentWithLangChain(
  * Now uses HuggingFace embeddings (free) with padding for DB compatibility
  */
 export function createLangChainEmbeddings(): Embeddings {
-  return new VoyageEmbeddings();
+  return new JinaEmbeddings();
 }
 
 /**
@@ -1102,7 +1116,7 @@ export function shouldUseBlobStorage(fileSize: number): boolean {
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const embeddings = new VoyageEmbeddings();
+    const embeddings = new JinaEmbeddings();
 
     const embedding = await embeddings.embedQuery(text);
     return embedding;
@@ -1137,7 +1151,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   try {
-    const embeddings = new VoyageEmbeddings();
+    const embeddings = new JinaEmbeddings();
 
     const embeddingVectors = await embeddings.embedDocuments(texts);
     return embeddingVectors;

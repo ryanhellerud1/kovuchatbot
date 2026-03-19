@@ -80,15 +80,15 @@ export async function POST(
 ): Promise<NextResponse<UploadResponse | ErrorResponse>> {
   console.log('[Knowledge Upload] Starting upload request processing');
 
-  // Check environment variables - embeddings use Voyage AI
-  if (!process.env.VOYAGE_API_KEY) {
-    console.error('[Knowledge Upload] VOYAGE_API_KEY is not set');
+  // Check environment variables - embeddings use Jina AI
+  if (!process.env.JINA_API_KEY) {
+    console.error('[Knowledge Upload] JINA_API_KEY is not set');
     return NextResponse.json(
       {
         success: false,
-        error: 'Voyage AI API key not configured',
+        error: 'Jina AI API key not configured',
         details:
-          'The server is missing the required VOYAGE_API_KEY for generating embeddings',
+          'The server is missing the required JINA_API_KEY for generating embeddings',
       },
       {
         status: 500,
@@ -456,7 +456,7 @@ export async function POST(
         );
       }
 
-      if (error.message.includes('Voyage AI embedding error') || error.message.includes('OpenAI') || error.message.includes('Google API error')) {
+      if (error.message.includes('Jina embedding error') || error.message.includes('embedding error') || error.message.includes('Google API error')) {
         return NextResponse.json(
           {
             success: false,
