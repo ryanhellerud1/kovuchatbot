@@ -3,73 +3,59 @@ import { Embeddings } from '@langchain/core/embeddings';
 import { Document } from '@langchain/core/documents';
 
 /**
- * Google Gemini embeddings - free and reliable
- * Pads to 1536 dimensions for database compatibility
+ * Voyage AI embeddings using voyage-code-2
+ * Outputs 1536 dimensions natively - matches database schema exactly
+ * Free tier: 50M tokens
  */
-class GoogleEmbeddings extends Embeddings {
+class VoyageEmbeddings extends Embeddings {
   private apiKey: string;
-  private targetDimension = 1536;
 
   constructor() {
     super({});
-    this.apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
+    this.apiKey = process.env.VOYAGE_API_KEY || '';
   }
 
-  private padEmbedding(embedding: number[]): number[] {
-    if (embedding.length >= this.targetDimension) {
-      return embedding.slice(0, this.targetDimension);
+  private async callVoyageAPI(texts: string[], inputType: 'document' | 'query'): Promise<number[][]> {
+    const response = await fetch('https://api.voyageai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'voyage-code-2',
+        input: texts,
+        input_type: inputType,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Voyage AI embedding error: ${response.status} - ${error}`);
     }
-    const padded = new Array(this.targetDimension).fill(0);
-    for (let i = 0; i < embedding.length; i++) {
-      padded[i] = embedding[i];
-    }
-    return padded;
+
+    const data = await response.json();
+    return data.data
+      .sort((a: any, b: any) => a.index - b.index)
+      .map((item: any) => item.embedding);
   }
 
-  private async callGoogleAPI(texts: string[]): Promise<number[][]> {
+  async embedDocuments(texts: string[]): Promise<number[][]> {
     const results: number[][] = [];
-    const batchSize = 100; // Google API supports up to 100 per batch
+    const batchSize = 128; // Voyage supports up to 128 texts per batch
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize);
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requests: batch.map(text => ({
-              model: 'models/gemini-embedding-001',
-              content: { parts: [{ text }] },
-              outputDimensionality: this.targetDimension,
-            })),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Google API error: ${response.status} - ${error}`);
-      }
-
-      const data = await response.json();
-      for (const embedding of data.embeddings) {
-        results.push(embedding.values);
-      }
+      const embeddings = await this.callVoyageAPI(batch, 'document');
+      results.push(...embeddings);
     }
 
     return results;
   }
 
-  async embedDocuments(texts: string[]): Promise<number[][]> {
-    const embeddings = await this.callGoogleAPI(texts);
-    return embeddings.map(emb => this.padEmbedding(emb));
-  }
-
   async embedQuery(text: string): Promise<number[]> {
-    const embeddings = await this.callGoogleAPI([text]);
-    return this.padEmbedding(embeddings[0]);
+    const embeddings = await this.callVoyageAPI([text], 'query');
+    return embeddings[0];
   }
 }
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
@@ -419,7 +405,7 @@ export async function processDocument(
     console.log(`[LangChain] Split into ${documents.length} chunks`);
 
     // Generate embeddings
-    const embeddings = new GoogleEmbeddings();
+    const embeddings = new VoyageEmbeddings();
 
     const texts = documents.map((doc) => doc.pageContent);
     const embeddingVectors = await embeddings.embedDocuments(texts);
@@ -580,7 +566,7 @@ export async function searchKnowledgeBase(
       );
     }
 
-    const embeddings = new GoogleEmbeddings();
+    const embeddings = new VoyageEmbeddings();
 
     const vectorStore = await createPostgreSQLVectorStore(userId, embeddings);
 
@@ -1065,7 +1051,7 @@ export async function saveDocumentWithLangChain(
  * Now uses HuggingFace embeddings (free) with padding for DB compatibility
  */
 export function createLangChainEmbeddings(): Embeddings {
-  return new GoogleEmbeddings();
+  return new VoyageEmbeddings();
 }
 
 /**
@@ -1116,7 +1102,7 @@ export function shouldUseBlobStorage(fileSize: number): boolean {
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const embeddings = new GoogleEmbeddings();
+    const embeddings = new VoyageEmbeddings();
 
     const embedding = await embeddings.embedQuery(text);
     return embedding;
@@ -1151,7 +1137,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   try {
-    const embeddings = new GoogleEmbeddings();
+    const embeddings = new VoyageEmbeddings();
 
     const embeddingVectors = await embeddings.embedDocuments(texts);
     return embeddingVectors;
